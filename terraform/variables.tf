@@ -78,7 +78,7 @@ variable "subnet" {
 }
 
 variable "scaler_cycle_seconds" {
-  description = "The cycle duration in seconds for the autoscaler's core logic loop. Passed as CYCLE_SECONDS env var to the container."
+  description = "The cycle duration in seconds for the autoscaler's core logic loop. Passed as CYCLE_SECONDS env var to the container. If overridden, please set it to at least 5 seconds."
   type        = number
   default     = 60
 }

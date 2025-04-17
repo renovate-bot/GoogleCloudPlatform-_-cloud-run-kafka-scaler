@@ -40,8 +40,6 @@ locals {
   scaler_sa_email  = "${local.scaler_sa_id}@${var.project_id}.iam.gserviceaccount.com"
   scheduler_sa_email = "${local.scheduler_sa_id}@${var.project_id}.iam.gserviceaccount.com"
 
-  scaler_http_url_constructed = "https://${var.scaler_service_name}-${data.google_project.project.number}.${var.region}.run.app"
-
   # Environment variables for the scaler Cloud Run service
   scaler_env_vars = {
     KAFKA_TOPIC_ID                     = var.topic_id
@@ -250,6 +248,7 @@ resource "google_cloud_run_v2_service" "scaler_service" {
 
     containers {
       image = var.scaler_image_path
+      base_image_uri = "us-central1-docker.pkg.dev/serverless-runtimes/google-22/runtimes/java17"
 
       env {
         name  = "KAFKA_TOPIC_ID"
@@ -270,10 +269,6 @@ resource "google_cloud_run_v2_service" "scaler_service" {
       env {
         name  = "INVOKER_SERVICE_ACCOUNT_EMAIL"
         value = local.scaler_env_vars.INVOKER_SERVICE_ACCOUNT_EMAIL
-      }
-      env {
-        name  = "SCALER_HTTP_URL"
-        value = local.scaler_http_url_constructed
       }
 
       volume_mounts {

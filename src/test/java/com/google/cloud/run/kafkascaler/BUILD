@@ -47,7 +47,9 @@ java_test(
     srcs = ["SelfSchedulerTest.java"],
     test_class = "com.google.cloud.run.kafkascaler.SelfSchedulerTest",
     deps = [
+        "//src/main/java/com/google/cloud/run/kafkascaler:configuration_provider",
         "//src/main/java/com/google/cloud/run/kafkascaler:self_scheduler",
+        "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_metadata_client",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_tasks_client_wrapper",
         "@maven//:com_google_api_grpc_proto_google_cloud_tasks_v2",
         "@maven//:com_google_guava_guava",
@@ -143,7 +145,6 @@ java_test(
     test_class = "com.google.cloud.run.kafkascaler.ConfigurationProviderTest",
     deps = [
         "//src/main/java/com/google/cloud/run/kafkascaler:configuration_provider",
-        "//src/main/java/com/google/cloud/run/kafkascaler:self_scheduler",
         "//src/main/java/com/google/cloud/run/kafkascaler:workload_info_parser",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
         "@maven//:com_google_guava_guava",

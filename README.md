@@ -21,90 +21,68 @@ Update the included `cloudbuild.yaml` to specify the output image name by updati
 gcloud builds submit --tag us-central1-docker.pkg.dev/my-project/my-repo/my_kafka_autoscaler
 ```
 
-This will build the container image and push it to Artifact Registry.
+This will build the container image and push it to Artifact Registry. Record the full **Image Path** (`SCALER_IMAGE_PATH`), since we'll need it for later
 
 Note that the resulting image will not run locally. It is intended to be layered on top of a Java base image. See [Automatic base image updates](https://cloud.google.com/run/docs/configuring/services/automatic-base-image-updates) for more information including how to reassemble the container image to run locally.
 
-## Setting up and deploying the autoscaler
+## Setting up and Deploying the Autoscaler
 
-### Required roles
+You can set up the necessary Google Cloud components and deploy the Kafka Autoscaler service using one of two methods:
+
+1.  **Manual Setup:** Using the `gcloud` CLI commands and the provided shell script (`setup_kafka_scaler.sh`). This gives you fine-grained control over each step.
+2.  **Automated Setup (Terraform):** Using the provided Terraform module (`terraform/`) to automate the creation of all required resources.
+
+Before deploying the autoscaler using either the manual or Terraform method, ensure the following prerequisites are met:
+
+### Prerequisites
+
+#### 1. Kafka Cluster
+
+* A Kafka cluster must be running and accessible (e.g., via VPC or Managed Kafka).
+*   A [Kafka Topic](https://kafka.apache.org/documentation/#basic_ops_add_topic) must be configured,
+    with events that are being published to that topic.
+*   Your Kafka consumers should specify a [Consumer Group
+    ID](https://kafka.apache.org/documentation/#consumerconfigs_group.id) when
+    connecting to the cluster.
+
+
+#### 2. Deployed Cloud Run Consumer
+* A Kafka consumer workload must be deployed to Cloud Run (as a Service or Worker Pool) and configured to connect to your Kafka cluster and topic/consumer group.
+* Identify the **Service Account email** used by this consumer workload (`CONSUMER_SA_EMAIL`). This service account needs permissions to interact with Kafka (e.g., read offsets).
+*   **(Best Practice)** Connect your Kafka consumers to your VPC network using [Direct
+    VPC](https://cloud.google.com/run/docs/configuring/vpc-direct-vpc). This
+    allows you to connect to your Kafka cluster using private IP addresses, and
+    keep traffic on your VPC network.
+*   **(Best Practice)** Configure a [liveness healthcheck](https://cloud.google.com/run/docs/configuring/worker-pools/healthchecks)
+    for your Kafka consumers that checks the Consumer is pulling events. This
+    ensures unhealthy instances automatically restart if they stop processing
+    events, even if the container doesn't crash.
+
+#### 3. Required Roles
 
 To get the permissions that you need to deploy and run this service, ask your
 administrator to grant you the following IAM roles:
 
 *   [Cloud Run Developer](https://cloud.google.com/iam/docs/understanding-roles#run.developer)
-    (roles/run.developer)
+    (`roles/run.developer`)
 *   [Service Account User](https://cloud.google.com/iam/docs/understanding-roles#iam.serviceAccountUser)
-    (roles/iam.serviceAccountUser)
+    (`roles/iam.serviceAccountUser`)
 *   [Artifact Registry Reader](https://cloud.google.com/iam/docs/understanding-roles#artifactregistry.reader)
-    (roles/artifactregistry.reader)
+    (`roles/artifactregistry.reader`) to access the Scaler image
 *   [Cloud Scheduler Admin](https://cloud.google.com/iam/docs/understanding-roles#cloudscheduler.admin)
-(roles/cloudscheduler.admin) to create the Cloud Scheduler job to trigger
+(`roles/cloudscheduler.admin`) to create the Cloud Scheduler job to trigger
     autoscaling checks
 *   [Cloud Tasks Queue Admin](https://cloud.google.com/iam/docs/understanding-roles#cloudtasks.queueAdmin)
-(roles/cloudtasks.queueAdmin) to create the Cloud Tasks queue for autoscaling
+(`roles/cloudtasks.queueAdmin`) to create the Cloud Tasks queue for autoscaling
     checks
 *   [Security Admin](https://cloud.google.com/iam/docs/understanding-roles#iam.securityAdmin)
-(roles/iam.securityAdmin) to grant permissions to service accounts
+(`roles/iam.securityAdmin`) to grant permissions to service accounts
 
-## Before you begin
+#### 4. Create Required Secrets 
 
-To configure and use the Kafka autoscaler, you'll need the following in place:
+The autoscaler requires two secrets containing configuration:
 
-*   A Kafka cluster must be running in a location accessible via your VPC, or
-    the [Managed Service for Apache
-    Kafka](https://cloud.google.com/products/managed-service-for-apache-kafka)
-    service.
-*   A [Kafka Topic
-    configured](https://kafka.apache.org/documentation/#basic_ops_add_topic),
-    with events that are being published to that topic.
-*   A Kafka consumer workload, deployed to Cloud Run, that is connected to your
-    Kafka cluster, and can connect to and pull from the configured topic.
-
-## Best practices
-
-*   Your Kafka consumers should specify a [Consumer Group
-    ID](https://kafka.apache.org/documentation/#consumerconfigs_group.id) when
-    connecting to the cluster.
-*   Connect your Kafka consumers to your VPC network using [Direct
-    VPC](https://cloud.google.com/run/docs/configuring/vpc-direct-vpc). This
-    allows you to connect to your Kafka cluster using private IP addresses, and
-    keep traffic on your VPC network.
-*   Configure a [liveness healthcheck](https://cloud.google.com/run/docs/configuring/worker-pools/healthchecks)
-    for your Kafka consumers that checks the Consumer is pulling events. This
-    ensures unhealthy instances automatically restart if they stop processing
-    events, even if the container doesn't crash.
-
-## Set up the Kafka autoscaler
-
-To simplify setup, you can set the following environment variables which will be
-used in throughout this user guide:
-
-```bash
-# Details for already-deployed Kafka consumer
-export PROJECT_ID=<project-id>
-export PROJECT_NUM=<project-number>
-export REGION=<region>
-export CONSUMER_SERVICE_NAME=<deployed-kafka-consumer>
-export CONSUMER_SA_EMAIL=<kafka-consumer-service-account-email i.e. NAME@PROJECT-ID.iam.gserviceaccount.com>
-export TOPIC_ID=<kafka-topic-id>
-export CONSUMER_GROUP_ID=<kafka-consumer-group-id>
-export NETWORK=<vpc-network>
-export SUBNET=<vpc-subnet>
-
-# Details for new items to be created during this setup
-export CLOUD_TASKS_QUEUE_NAME=<cloud-tasks-queue-for-scaling-checks>
-export TASKS_SERVICE_ACCOUNT=<tasks-service-account-name>
-
-export SCALER_SERVICE_NAME=<kafka-autoscaler-service-name>
-export SCALER_IMAGE_PATH=<kafka-autoscaler-image-URI>
-export SCALER_CONFIG_SECRET=<kafka-autoscaler-config-secret-name>
-
-export CYCLE_SECONDS=<scaler-check-frequency e.g. 15>
-```
-
-### Create the Kafka Admin client secret
-
+##### a) Kafka Admin Client Secret (`ADMIN_CLIENT_SECRET`)
 The Kafka autoscaler connects to the Kafka cluster using the configuration
 provided in a secret that will be mounted as a volume on the Kafka autoscaler
 service.
@@ -141,8 +119,7 @@ To create the secret volume, copy the configuration into a file named
 gcloud secrets create $ADMIN_CLIENT_SECRET --data-file=kafka_auth_config.txt
 ```
 
-### Create the scaling configuration secret
-
+##### b) Scaler Configuration Secret (`SCALER_CONFIG_SECRET`)
 The Kafka autoscaler uses the configuration provided in this secret to specify
 the Kafka consumer to autoscale, as well as to adjust scaling behavior. Like the
 Kafka Admin client secret, this will be mounted as a volume on the Kafka
@@ -163,8 +140,6 @@ You may also change any of the settings under `behavior`, as desired, or you may
 leave the defaults. This section supports many of the same properties as
 Kubernetes [HPA scaling
 policies](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#scaling-policies).
-
-#### Scaling metrics
 
 The following elements must be configured for the Kafka autoscaler to function:
 
@@ -191,7 +166,7 @@ Note: While you may choose to configure `consumer_lag` only, we recommend
 starting with both `consumer_lag` and `cpu`, as just using `consumer_lag` can
 have unexpected results.
 
-##### Optional settings and defaults
+###### Optional settings and defaults
 
 In addition the the metric targets, you can optionally configure additional
 elements to adjust scaling behavior. If not configured, the default values
@@ -230,7 +205,7 @@ spec:
           tolerance: `%LAG_TOLERANCE%`
 ```
 
-#### Optional scaling policies
+###### Optional scaling policies
 
 If only the required elements are set, the default scaling policies, below,
 are used. Alternatively, you can configure either, or both, `scaleDown` and/or
@@ -258,7 +233,7 @@ behavior:
     selectPolicy: Max
 ```
 
-#### Full example config using default values
+###### Full example config using default values
 
 ```yaml
 spec:
@@ -302,7 +277,8 @@ behavior:
       periodSeconds: 15
     selectPolicy: Max
 ```
-#### Create the secret
+
+###### Create the secret
 
 To create the secret, from the same directory containing the
 `scaler_config.yaml` file, run:
@@ -311,9 +287,56 @@ To create the secret, from the same directory containing the
 gcloud secrets create $SCALER_CONFIG_SECRET --data-file=scaler_config.yaml
 ```
 
-## Set up additional components and deploy Kafka autoscaler
 
-The `setup_kafka_scaler.sh` script does the following:
+
+## Deployment Options
+
+With the prerequisites completed, as mentioned earlier, you can deploy the Kafka Autoscaler service and its supporting infrastructure using one of the following methods:
+
+1.  **Manual Deployment:** Using `gcloud` CLI commands and the provided shell script.
+2.  **Automated Deployment (Terraform):** Using the provided Terraform module.
+
+Choose the method that best suits your workflow.
+
+### Option 1: Manual Deployment (`gcloud` / Shell Script)
+
+This approach uses the `setup_kafka_scaler.sh` script to create and configure the necessary resources.
+
+#### Set Environment Variables 
+
+Before running the script, ensure that you have set **all** the environment variables mentioned below
+
+```bash
+# Details for already-deployed Kafka consumer
+export PROJECT_ID=<project-id>
+export REGION=<region>
+export CONSUMER_SERVICE_NAME=<deployed-kafka-consumer>
+export CONSUMER_SA_EMAIL=<kafka-consumer-service-account-email i.e. NAME@PROJECT-ID.iam.gserviceaccount.com>
+export TOPIC_ID=<kafka-topic-id>
+export CONSUMER_GROUP_ID=<kafka-consumer-group-id>
+export NETWORK=<vpc-network>
+export SUBNET=<vpc-subnet>
+
+# Details for new items to be created during this setup
+export CLOUD_TASKS_QUEUE_NAME=<cloud-tasks-queue-for-scaling-checks>
+export TASKS_SERVICE_ACCOUNT=<tasks-service-account-name>
+
+export SCALER_SERVICE_NAME=<kafka-autoscaler-service-name>
+export SCALER_IMAGE_PATH=<kafka-autoscaler-image-URI>
+export SCALER_CONFIG_SECRET=<kafka-autoscaler-config-secret-name>
+
+export CYCLE_SECONDS=<scaler-check-frequency e.g. 15> # Note: this should be at least 5 seconds
+```
+
+#### Run the Setup Script
+
+Execute the provided `setup_kafka_scaler.sh` script, as follows
+
+```bash
+./setup_kafka_scaler.sh
+```
+
+The script performs these actions:
 
 *   Creates the Cloud Tasks queue used to trigger autoscaling checks
 *   Creates the Kafka autoscaler service account, and grants necessary
@@ -322,22 +345,38 @@ The `setup_kafka_scaler.sh` script does the following:
 *   Create the Cloud Scheduler job that periodically triggers autoscaling checks
 
 When run, `setup_kafka_scaler.sh` will output the configured environment
-variables, please verify they are correct before continuing.
+variables. Please verify they are correct before continuing.
 
-### Grant Kafka autoscaler service account additional permissions
-
+#### Grant Additional Permissions 
 In order to change the instance count of the Kafka consumer, the Kafka
 autoscaler service account must have view permission on the deployed container
 image. For example, if the consumer image was deployed from Artifact Registry,
-run:
+please run:
+
 
 ```bash
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/artifactregistry.reader"
+  --role="roles/artifactregistry.reader" # Or appropriate role for your registry
 ```
 
-## Verify Kafka autoscaling is working
+### Option 2: Automated Deployment (Terraform)
+
+The `terraform/` directory contains a reusable Terraform module to provision the Kafka Autoscaler and its associated resources.
+
+This module automates the creation of:
+
+* The Kafka Autoscaler Cloud Run service
+* Supporting Service Accounts and IAM bindings
+* Cloud Tasks queue
+* Cloud Scheduler job
+
+For detailed instructions, usage examples, and descriptions of all input/output variables, please refer to [**`terraform/README.md`**](terraform/README.md)
+
+Remember to provide the necessary variables to the Terraform module, including details from the prerequisites (project ID, region, consumer SA email, secret names, scaler image path, topic ID, etc.).
+
+
+## Verify Kafka Autoscaling is Working
 
 The Kafka autoscaler service's scaling is triggered with a request to the
 service URL.
@@ -348,7 +387,7 @@ service URL.
 In the logs of your Kafka autoscaler service, you should see messages like
 *There are currently X consumers and Y total lag. Recommending Z consumers.*
 
-## Reference: Scaling configuration
+## Reference: Scaling Configuration
 
 Note: See [Kubernetes Horizontal Pod
 Autoscaling](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/horizontal-pod-autoscaler-v2/#HorizontalPodAutoscalerSpec)

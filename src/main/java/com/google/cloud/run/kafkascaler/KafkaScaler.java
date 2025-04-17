@@ -18,6 +18,7 @@ package com.google.cloud.run.kafkascaler;
 
 import com.google.cloud.run.kafkascaler.clients.CloudMonitoringClientWrapper;
 import com.google.cloud.run.kafkascaler.clients.CloudRunClientWrapper;
+import com.google.cloud.run.kafkascaler.clients.CloudRunMetadataClient;
 import com.google.cloud.run.kafkascaler.clients.CloudTasksClientWrapper;
 import com.google.cloud.run.kafkascaler.clients.KafkaAdminClientWrapper;
 import com.google.cloud.run.kafkascaler.scalingconfig.ScalingConfig;
@@ -94,13 +95,16 @@ final class KafkaScaler {
   }
 
   private SelfScheduler initializeSelfScheduler() throws IOException {
+    CloudRunMetadataClient cloudRunMetadataClient = new CloudRunMetadataClient();
+
     ConfigurationProvider configProvider =
         new ConfigurationProvider(
             new ConfigurationProvider.SystemEnvProvider(), SCALING_CONFIG_FILE);
 
     return new SelfScheduler(
         new CloudTasksClientWrapper(CloudTasksClientWrapper.cloudTasksClient()),
-        configProvider.selfSchedulingConfig());
+        cloudRunMetadataClient,
+        configProvider);
   }
 
   class RequestHandler implements HttpHandler {

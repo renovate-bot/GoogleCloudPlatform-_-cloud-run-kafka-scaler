@@ -35,6 +35,8 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 
 /**
@@ -45,11 +47,24 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
  */
 class ConfigurationProvider {
 
+  // A cycle time greater than or equal to this will be ignored.
+  public static final Duration MAX_CYCLE_DURATION = Duration.ofMinutes(1);
+
+  // Scheduling config that disables self-scheduling.
+  public static final SchedulingConfig SELF_SCHEDULING_DISABLED_CONFIG =
+      new ConfigurationProvider.SchedulingConfig("", "", MAX_CYCLE_DURATION);
+
   /**
    * Static configuration for Kafka Scaler. These fields should only be read at startup, and should
    * not be changed during the lifetime of the application.
    */
   public record StaticConfig(String topicName, String consumerGroupId, boolean useMinInstances) {}
+
+  /** Configuration for self-scheduling. */
+  public record SchedulingConfig(
+      String fullyQualifiedCloudTaskQueueName,
+      String invokerServiceAccountEmail,
+      Duration cycleDuration) {}
 
   public static interface EnvProvider {
     String getEnv(String name);
@@ -168,8 +183,8 @@ class ConfigurationProvider {
    * @throws IllegalArgumentException If the CYCLE_SECONDS environment variable is set but not a
    *     number, or if required environment variables are missing when CYCLE_SECONDS is set.
    */
-  SelfScheduler.SchedulingConfig selfSchedulingConfig() {
-    SelfScheduler.SchedulingConfig schedulingConfig = SelfScheduler.SELF_SCHEDULING_DISABLED_CONFIG;
+  SchedulingConfig selfSchedulingConfig() {
+    SchedulingConfig schedulingConfig = SELF_SCHEDULING_DISABLED_CONFIG;
 
     String cycleSecondsEnvVar = envProvider.getEnv("CYCLE_SECONDS");
     int cycleSeconds;
@@ -183,9 +198,7 @@ class ConfigurationProvider {
       ImmutableSet<String> missingEnvVars =
           getMissingEnvVars(
               ImmutableSet.of(
-                  "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
-                  "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                  "SCALER_HTTP_URL"));
+                  "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME", "INVOKER_SERVICE_ACCOUNT_EMAIL"));
 
       if (!missingEnvVars.isEmpty()) {
         throw new IllegalArgumentException(
@@ -195,10 +208,9 @@ class ConfigurationProvider {
       }
 
       schedulingConfig =
-          new SelfScheduler.SchedulingConfig(
+          new SchedulingConfig(
               envProvider.getEnv("FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME"),
               envProvider.getEnv("INVOKER_SERVICE_ACCOUNT_EMAIL"),
-              envProvider.getEnv("SCALER_HTTP_URL"),
               Duration.ofSeconds(cycleSeconds));
     }
 
@@ -235,4 +247,38 @@ class ConfigurationProvider {
     System.out.println("Current scaling config: " + finalScalingConfig);
     return finalScalingConfig;
   }
+
+  /**
+   * Provides the URL of the current service.
+   *
+   * @param projectNumberRegion The project number and region in the format
+   *     projects/PROJECT_NUMBER/regions/REGION.
+   * @return The URL of the current service.
+   * @throws IllegalArgumentException If the project number and region is not in the correct format.
+   * @throws IllegalStateException If the K_SERVICE environment variable is not set.
+   */
+  public String scalerUrl(String projectNumberRegion) throws IOException {
+    Matcher projectNumberRegionMatcher = PROJECT_NUMBER_REGION_PATTERN.matcher(projectNumberRegion);
+
+    if (!projectNumberRegionMatcher.matches()) {
+      // This should only ever happen if Cloud Run metadata server is returning data in a new,
+      // unexpected format.
+      throw new IllegalArgumentException(
+          "Failed to parse project number and region from: " + projectNumberRegion);
+    }
+
+    if (isNullOrEmpty(envProvider.getEnv("K_SERVICE"))) {
+      // This is set by Cloud Run so this should never actually be null or empty.
+      throw new IllegalStateException("K_SERVICE is null or empty.");
+    }
+
+    String projectNumber = projectNumberRegionMatcher.group(1);
+    String region = projectNumberRegionMatcher.group(2);
+    String serviceName = envProvider.getEnv("K_SERVICE");
+
+    return String.format("https://%s-%s.%s.run.app", serviceName, projectNumber, region);
+  }
+
+  private static final Pattern PROJECT_NUMBER_REGION_PATTERN =
+      Pattern.compile("projects/([0-9]+)/regions/([^/]+)");
 }

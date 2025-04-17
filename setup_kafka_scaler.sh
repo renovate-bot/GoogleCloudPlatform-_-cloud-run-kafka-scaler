@@ -32,11 +32,6 @@ if [[ -v PROJECT_ID ]]; then
 else
   echo "***** PROJECT_ID is not set. ***** "
 fi
-if [[ -v PROJECT_NUM ]]; then
-  echo "PROJECT_NUM: " $PROJECT_NUM
-else
-  echo "***** PROJECT_NUM is not set. ***** "
-fi
 if [[ -v REGION ]]; then
   echo "REGION: " $REGION
 else
@@ -105,7 +100,6 @@ else
 fi
 
 SCALER_SA_NAME=$SCALER_SERVICE_NAME-sa
-SCALER_HTTP_URL=https://$SCALER_SERVICE_NAME-$PROJECT_NUM.$REGION.run.app
 
 printf "\nAutoscaling frequency:\n"
 if [[ -v CYCLE_SECONDS ]]; then
@@ -178,8 +172,7 @@ echo -n 'KAFKA_TOPIC_ID: $TOPIC_ID
 CONSUMER_GROUP_ID: $CONSUMER_GROUP_ID
 CYCLE_SECONDS: "$CYCLE_SECONDS"
 FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME: $FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME
-INVOKER_SERVICE_ACCOUNT_EMAIL: $TASKS_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com
-SCALER_HTTP_URL: $SCALER_HTTP_URL' > scaler_env_vars.yaml
+INVOKER_SERVICE_ACCOUNT_EMAIL: $TASKS_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com' > scaler_env_vars.yaml
 
 ####
 # Deploy the Kafka autoscaler

@@ -39,6 +39,8 @@ java_library(
     name = "self_scheduler",
     srcs = ["SelfScheduler.java"],
     deps = [
+        ":configuration_provider",
+        "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_metadata_client",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_tasks_client_wrapper",
         "@maven//:com_google_api_grpc_proto_google_cloud_tasks_v2",
         "@maven//:com_google_guava_guava",
@@ -95,7 +97,6 @@ java_library(
     name = "configuration_provider",
     srcs = ["ConfigurationProvider.java"],
     deps = [
-        ":self_scheduler",
         ":workload_info_parser",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:default_behavior",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:merger",
@@ -153,6 +154,7 @@ java_binary(
         ":workload_info_parser",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_monitoring_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_client_wrapper",
+        "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_metadata_client",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_tasks_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:kafka_admin_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",

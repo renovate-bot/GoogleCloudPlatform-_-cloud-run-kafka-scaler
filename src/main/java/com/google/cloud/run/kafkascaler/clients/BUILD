@@ -55,3 +55,8 @@ java_library(
         "@maven//:com_google_cloud_google_cloud_monitoring",
     ],
 )
+
+java_library(
+    name = "cloud_run_metadata_client",
+    srcs = ["CloudRunMetadataClient.java"],
+)

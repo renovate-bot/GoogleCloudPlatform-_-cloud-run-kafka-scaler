@@ -19,24 +19,29 @@ package com.google.cloud.run.kafkascaler;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.run.kafkascaler.clients.CloudRunMetadataClient;
 import com.google.cloud.run.kafkascaler.clients.CloudTasksClientWrapper;
 import com.google.cloud.tasks.v2.HttpMethod;
 import com.google.cloud.tasks.v2.HttpRequest;
 import com.google.cloud.tasks.v2.Task;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Timestamp;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 @RunWith(JUnit4.class)
 public final class SelfSchedulerTest {
@@ -46,15 +51,22 @@ public final class SelfSchedulerTest {
   private static final String INVOKER_SERVICE_ACCOUNT_EMAIL = "invoker-service-account-email";
   private static final String SCALER_URL = "scaler-url";
 
+  @Rule public final MockitoRule mockito = MockitoJUnit.rule();
+
+  @Mock private CloudTasksClientWrapper cloudTasksClientWrapper;
+  @Mock private CloudRunMetadataClient cloudRunMetadataClient;
+  @Mock private ConfigurationProvider configurationProvider;
+
   @Test
   public void scheduleAdditionalTasks_cycleTimeTooLong_doesNotScheduleTasks() {
-    CloudTasksClientWrapper cloudTasksClientWrapper = mock(CloudTasksClientWrapper.class);
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofMinutes(1));
 
-    SelfScheduler.SchedulingConfig schedulingConfig =
-        new SelfScheduler.SchedulingConfig(
-            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, SCALER_URL, Duration.ofMinutes(1));
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
 
-    SelfScheduler selfScheduler = new SelfScheduler(cloudTasksClientWrapper, schedulingConfig);
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
 
     Instant now = Instant.now();
     selfScheduler.scheduleTasks(now, ImmutableMap.of());
@@ -64,13 +76,13 @@ public final class SelfSchedulerTest {
 
   @Test
   public void scheduleAdditionalTasks_headerWithAnyCase_doesNotScheduleTasksForSelfScheduledTask() {
-    CloudTasksClientWrapper cloudTasksClientWrapper = mock(CloudTasksClientWrapper.class);
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofSeconds(30));
 
-    SelfScheduler.SchedulingConfig schedulingConfig =
-        new SelfScheduler.SchedulingConfig(
-            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, SCALER_URL, Duration.ofSeconds(30));
-
-    SelfScheduler selfScheduler = new SelfScheduler(cloudTasksClientWrapper, schedulingConfig);
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
 
     Instant now = Instant.now();
     selfScheduler.scheduleTasks(now, ImmutableMap.of("Kafka-Scaler-Self-Scheduled", "true"));
@@ -80,14 +92,17 @@ public final class SelfSchedulerTest {
   }
 
   @Test
-  public void scheduleAdditionalTasks_nullMap_schedulesTheRightNumberOfTasks() {
-    CloudTasksClientWrapper cloudTasksClientWrapper = mock(CloudTasksClientWrapper.class);
+  public void scheduleAdditionalTasks_nullMap_schedulesTheRightNumberOfTasks() throws IOException {
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofSeconds(20));
 
-    SelfScheduler.SchedulingConfig schedulingConfig =
-        new SelfScheduler.SchedulingConfig(
-            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, SCALER_URL, Duration.ofSeconds(20));
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
 
-    SelfScheduler selfScheduler = new SelfScheduler(cloudTasksClientWrapper, schedulingConfig);
+    when(configurationProvider.scalerUrl(any())).thenReturn(SCALER_URL);
+
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
 
     ArgumentCaptor<Task> taskCaptor = ArgumentCaptor.forClass(Task.class);
     Task task = Task.newBuilder().setName("task-name").build();
@@ -100,14 +115,17 @@ public final class SelfSchedulerTest {
   }
 
   @Test
-  public void scheduleAdditionalTasks_emptyHeadersMap_schedulesTheRightNumberOfTasks() {
-    CloudTasksClientWrapper cloudTasksClientWrapper = mock(CloudTasksClientWrapper.class);
+  public void scheduleAdditionalTasks_emptyHeadersMap_schedulesTheRightNumberOfTasks()
+      throws IOException {
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofSeconds(13));
 
-    SelfScheduler.SchedulingConfig schedulingConfig =
-        new SelfScheduler.SchedulingConfig(
-            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, SCALER_URL, Duration.ofSeconds(13));
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
+    when(configurationProvider.scalerUrl(any())).thenReturn(SCALER_URL);
 
-    SelfScheduler selfScheduler = new SelfScheduler(cloudTasksClientWrapper, schedulingConfig);
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
 
     ArgumentCaptor<Task> taskCaptor = ArgumentCaptor.forClass(Task.class);
     Task task = Task.newBuilder().setName("task-name").build();
@@ -120,14 +138,16 @@ public final class SelfSchedulerTest {
   }
 
   @Test
-  public void scheduleAdditionalTasks_schedulesTasks() {
-    CloudTasksClientWrapper cloudTasksClientWrapper = mock(CloudTasksClientWrapper.class);
+  public void scheduleAdditionalTasks_schedulesTasks() throws IOException {
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofSeconds(30));
 
-    SelfScheduler.SchedulingConfig schedulingConfig =
-        new SelfScheduler.SchedulingConfig(
-            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, SCALER_URL, Duration.ofSeconds(30));
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
+    when(configurationProvider.scalerUrl(any())).thenReturn(SCALER_URL);
 
-    SelfScheduler selfScheduler = new SelfScheduler(cloudTasksClientWrapper, schedulingConfig);
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
 
     ArgumentCaptor<Task> taskCaptor = ArgumentCaptor.forClass(Task.class);
     Task task = Task.newBuilder().setName("task-name").build();
@@ -153,5 +173,27 @@ public final class SelfSchedulerTest {
     assertThat(request.getUrl()).isEqualTo(SCALER_URL);
     assertThat(request.getHttpMethod()).isEqualTo(HttpMethod.POST);
     assertThat(request.getHeadersMap()).containsEntry("Kafka-Scaler-Self-Scheduled", "true");
+  }
+
+  @Test
+  public void scheduleAdditionalTasks_configProviderThrowsException_doesNotschedulesTasks()
+      throws IOException {
+    ConfigurationProvider.SchedulingConfig schedulingConfig =
+        new ConfigurationProvider.SchedulingConfig(
+            QUEUE_NAME, INVOKER_SERVICE_ACCOUNT_EMAIL, Duration.ofSeconds(30));
+
+    when(configurationProvider.selfSchedulingConfig()).thenReturn(schedulingConfig);
+    when(configurationProvider.scalerUrl(any())).thenThrow(new IllegalArgumentException());
+
+    SelfScheduler selfScheduler =
+        new SelfScheduler(cloudTasksClientWrapper, cloudRunMetadataClient, configurationProvider);
+
+    Task task = Task.newBuilder().setName("task-name").build();
+    when(cloudTasksClientWrapper.createTask(any(), any())).thenReturn(task);
+
+    Instant now = Instant.now();
+    selfScheduler.scheduleTasks(now, ImmutableMap.of("Another-Header", "true"));
+
+    verify(cloudTasksClientWrapper, never()).createTask(any(), any());
   }
 }

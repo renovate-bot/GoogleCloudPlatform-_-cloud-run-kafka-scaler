@@ -16,6 +16,7 @@
  */
 package com.google.cloud.run.kafkascaler;
 
+import com.google.cloud.run.kafkascaler.clients.CloudRunMetadataClient;
 import com.google.cloud.run.kafkascaler.clients.CloudTasksClientWrapper;
 import com.google.cloud.tasks.v2.HttpMethod;
 import com.google.cloud.tasks.v2.HttpRequest;
@@ -24,6 +25,7 @@ import com.google.cloud.tasks.v2.Task;
 import com.google.common.base.Ascii;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Timestamp;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -36,31 +38,26 @@ import java.util.Map;
  */
 public final class SelfScheduler {
 
-  /** Configuration for self-scheduling. */
-  public record SchedulingConfig(
-      String fullyQualifiedCloudTaskQueueName,
-      String invokerServiceAccountEmail,
-      String scalerUrl,
-      Duration cycleDuration) {}
-
-  // A cycle time greater than or equal to this will be ignored.
-  private static final Duration MAX_CYCLE_DURATION = Duration.ofMinutes(1);
-
-  //  Scheduling config that disables self-scheduling.
-  public static final SchedulingConfig SELF_SCHEDULING_DISABLED_CONFIG =
-      new SchedulingConfig("", "", "", MAX_CYCLE_DURATION);
-
   private static final String SELF_SCHEDULED_HEADER_KEY = "Kafka-Scaler-Self-Scheduled";
 
   private final CloudTasksClientWrapper cloudTasks;
-  private final SchedulingConfig config;
+  private final CloudRunMetadataClient cloudRunMetadataClient;
+  private final ConfigurationProvider configProvider;
+  private final ConfigurationProvider.SchedulingConfig config;
+  private String scalerUrl;
 
-  public SelfScheduler(CloudTasksClientWrapper cloudTasksClientWrapper, SchedulingConfig config) {
-    Preconditions.checkNotNull(cloudTasksClientWrapper, "Cloud Tasks client cannot be null.");
-    Preconditions.checkNotNull(config, "Scheduling config cannot be null.");
-
-    this.cloudTasks = cloudTasksClientWrapper;
-    this.config = config;
+  public SelfScheduler(
+      CloudTasksClientWrapper cloudTasksClientWrapper,
+      CloudRunMetadataClient cloudRunMetadataClient,
+      ConfigurationProvider configProvider) {
+    this.cloudTasks =
+        Preconditions.checkNotNull(cloudTasksClientWrapper, "Cloud Tasks client cannot be null.");
+    this.cloudRunMetadataClient =
+        Preconditions.checkNotNull(
+            cloudRunMetadataClient, "Cloud Run metadata connection provider cannot be null.");
+    this.configProvider =
+        Preconditions.checkNotNull(configProvider, "Config Provider cannot be null.");
+    this.config = configProvider.selfSchedulingConfig();
   }
 
   /**
@@ -75,11 +72,22 @@ public final class SelfScheduler {
    * @param requestHeaders The request headers.
    */
   public void scheduleTasks(Instant now, Map<String, String> requestHeaders) {
-    if (config.cycleDuration().compareTo(MAX_CYCLE_DURATION) >= 0) {
+    if (config.cycleDuration().compareTo(ConfigurationProvider.MAX_CYCLE_DURATION) >= 0) {
       System.out.println(
           "Cycle duration is greater than or equal to max cycle duration; skipping additional task"
               + " scheduling.");
       return;
+    }
+
+    if (scalerUrl == null) {
+      try {
+        scalerUrl = configProvider.scalerUrl(cloudRunMetadataClient.projectNumberRegion());
+      } catch (RuntimeException | IOException e) {
+        System.err.println("[SCHEDULER] Failed to schedule additional tasks: " + e.getMessage());
+        // It's safe to continue here, we just can't schedule additional tasks. We'll try again on
+        // the next non-self-scheduled request.
+        return;
+      }
     }
 
     // Compare ignoring case to make this resilient to header formatting.
@@ -96,7 +104,7 @@ public final class SelfScheduler {
       if (followUpTasks > 0) {
         int taskIntervalSeconds = 60 / followUpTasks;
         for (int i = taskIntervalSeconds; i < 60; i += taskIntervalSeconds) {
-          scheduleTask(now.plus(Duration.ofSeconds(i)));
+          scheduleTask(now.plus(Duration.ofSeconds(i)), scalerUrl);
         }
       }
     }
@@ -110,16 +118,17 @@ public final class SelfScheduler {
    * enqueued.
    *
    * @param time The time at which the scaler should be invoked.
+   * @param scalerUrl The URL of the scaler service.
    */
-  private void scheduleTask(Instant time) {
+  private void scheduleTask(Instant time, String scalerUrl) {
     OidcToken oidcToken =
         OidcToken.newBuilder()
             .setServiceAccountEmail(config.invokerServiceAccountEmail())
-            .setAudience(config.scalerUrl())
+            .setAudience(scalerUrl)
             .build();
     HttpRequest httpRequest =
         HttpRequest.newBuilder()
-            .setUrl(config.scalerUrl())
+            .setUrl(scalerUrl)
             .setHttpMethod(HttpMethod.POST)
             .setOidcToken(oidcToken)
             .putHeaders(SELF_SCHEDULED_HEADER_KEY, "true")

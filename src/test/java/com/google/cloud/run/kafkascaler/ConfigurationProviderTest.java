@@ -46,7 +46,6 @@ public final class ConfigurationProviderTest {
       "projects/test-project/locations/test-region/queues/test-queue-name";
   private static final String INVOKER_SERVICE_ACCOUNT_EMAIL =
       "test-invoker-service-account-email@domain.com";
-  private static final String SCALER_HTTP_URL = "my.scaler.com";
   private static final String SCALING_CONFIG_FILE = "scaling.yaml";
 
   private static class FakeEnvProvider implements ConfigurationProvider.EnvProvider {
@@ -199,12 +198,10 @@ public final class ConfigurationProviderTest {
                     "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
                     FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME,
                     "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                    INVOKER_SERVICE_ACCOUNT_EMAIL,
-                    "SCALER_HTTP_URL",
-                    SCALER_HTTP_URL)),
+                    INVOKER_SERVICE_ACCOUNT_EMAIL)),
             SCALING_CONFIG_FILE);
 
-    SelfScheduler.SchedulingConfig schedulingConfig = configuration.selfSchedulingConfig();
+    ConfigurationProvider.SchedulingConfig schedulingConfig = configuration.selfSchedulingConfig();
     assertThat(schedulingConfig.cycleDuration()).isEqualTo(Duration.ofMinutes(1));
   }
 
@@ -219,9 +216,7 @@ public final class ConfigurationProviderTest {
                     "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
                     FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME,
                     "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                    INVOKER_SERVICE_ACCOUNT_EMAIL,
-                    "SCALER_HTTP_URL",
-                    SCALER_HTTP_URL)),
+                    INVOKER_SERVICE_ACCOUNT_EMAIL)),
             SCALING_CONFIG_FILE);
 
     assertThrows(IllegalArgumentException.class, configuration::selfSchedulingConfig);
@@ -238,9 +233,7 @@ public final class ConfigurationProviderTest {
                     "CYCLE_SECONDS",
                     "20",
                     "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                    INVOKER_SERVICE_ACCOUNT_EMAIL,
-                    "SCALER_HTTP_URL",
-                    SCALER_HTTP_URL)),
+                    INVOKER_SERVICE_ACCOUNT_EMAIL)),
             SCALING_CONFIG_FILE);
 
     assertThrows(IllegalArgumentException.class, configuration::selfSchedulingConfig);
@@ -256,26 +249,7 @@ public final class ConfigurationProviderTest {
                     "CYCLE_SECONDS",
                     "20",
                     "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
-                    FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME,
-                    "SCALER_HTTP_URL",
-                    SCALER_HTTP_URL)),
-            SCALING_CONFIG_FILE);
-
-    assertThrows(IllegalArgumentException.class, configuration::selfSchedulingConfig);
-  }
-
-  @Test
-  public void selfSchedulingConfig_missingScalerHttpUrl_throwsIllegalArgumentException() {
-    ConfigurationProvider configuration =
-        new ConfigurationProvider(
-            new FakeEnvProvider(
-                ImmutableMap.of(
-                    "CYCLE_SECONDS",
-                    "20",
-                    "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
-                    FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME,
-                    "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                    INVOKER_SERVICE_ACCOUNT_EMAIL)),
+                    FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME)),
             SCALING_CONFIG_FILE);
 
     assertThrows(IllegalArgumentException.class, configuration::selfSchedulingConfig);
@@ -292,17 +266,14 @@ public final class ConfigurationProviderTest {
                     "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME",
                     FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME,
                     "INVOKER_SERVICE_ACCOUNT_EMAIL",
-                    INVOKER_SERVICE_ACCOUNT_EMAIL,
-                    "SCALER_HTTP_URL",
-                    SCALER_HTTP_URL)),
+                    INVOKER_SERVICE_ACCOUNT_EMAIL)),
             SCALING_CONFIG_FILE);
 
-    SelfScheduler.SchedulingConfig schedulingConfig = configuration.selfSchedulingConfig();
+    ConfigurationProvider.SchedulingConfig schedulingConfig = configuration.selfSchedulingConfig();
     assertThat(schedulingConfig.fullyQualifiedCloudTaskQueueName())
         .isEqualTo(FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME);
     assertThat(schedulingConfig.invokerServiceAccountEmail())
         .isEqualTo(INVOKER_SERVICE_ACCOUNT_EMAIL);
-    assertThat(schedulingConfig.scalerUrl()).isEqualTo(SCALER_HTTP_URL);
     assertThat(schedulingConfig.cycleDuration()).isEqualTo(Duration.ofSeconds(20));
   }
 
@@ -337,5 +308,57 @@ public final class ConfigurationProviderTest {
     assertThat(behavior.scaleDown().policies().get(0).value()).isEqualTo(50);
     assertThat(behavior.scaleDown().policies().get(0).periodSeconds())
         .isEqualTo(Duration.ofSeconds(90));
+  }
+
+  @Test
+  public void scalerUrl_returnsScalerUrl() throws IOException {
+    ConfigurationProvider configuration =
+        new ConfigurationProvider(
+            new FakeEnvProvider(
+                ImmutableMap.of(
+                    "KAFKA_TOPIC_ID",
+                    TOPIC_NAME,
+                    "CONSUMER_GROUP_ID",
+                    CONSUMER_GROUP_ID,
+                    "K_SERVICE",
+                    "scaler-service")),
+            SCALING_CONFIG_FILE);
+
+    String scalerUrl = configuration.scalerUrl("projects/12345/regions/us-central1");
+    assertThat(scalerUrl).isEqualTo("https://scaler-service-12345.us-central1.run.app");
+  }
+
+  @Test
+  public void scalerUrl_missingKService_throwsIllegalStateException() throws IOException {
+    ConfigurationProvider configuration =
+        new ConfigurationProvider(
+            new FakeEnvProvider(
+                ImmutableMap.of(
+                    "KAFKA_TOPIC_ID", TOPIC_NAME, "CONSUMER_GROUP_ID", CONSUMER_GROUP_ID)),
+            SCALING_CONFIG_FILE);
+
+    assertThrows(
+        IllegalStateException.class,
+        () -> configuration.scalerUrl("projects/12345/regions/us-central1"));
+  }
+
+  @Test
+  public void scalerUrl_withMalformedProjectNumberRegion_throwsIllegalArgumentException()
+      throws IOException {
+    ConfigurationProvider configuration =
+        new ConfigurationProvider(
+            new FakeEnvProvider(
+                ImmutableMap.of(
+                    "KAFKA_TOPIC_ID",
+                    TOPIC_NAME,
+                    "CONSUMER_GROUP_ID",
+                    CONSUMER_GROUP_ID,
+                    "K_SERVICE",
+                    "scaler-service")),
+            SCALING_CONFIG_FILE);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> configuration.scalerUrl("projects/not-a-number/regions/us-central1"));
   }
 }
