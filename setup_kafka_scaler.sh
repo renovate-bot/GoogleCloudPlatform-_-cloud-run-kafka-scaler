@@ -48,8 +48,6 @@ else
   echo "***** CONSUMER_GROUP_ID is not set. ***** "
 fi
 
-FULLY_QUALIFIED_CONSUMER_NAME=projects/$PROJECT_ID/locations/$REGION/workerpools/$CONSUMER_SERVICE_NAME
-
 printf "\nKafka auth secret created in previous step:\n"
 if [[ -v ADMIN_CLIENT_SECRET ]]; then
   echo "ADMIN_CLIENT_SECRET is set."

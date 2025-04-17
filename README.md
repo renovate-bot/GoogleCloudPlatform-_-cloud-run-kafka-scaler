@@ -131,7 +131,7 @@ autoscaler service.
 Create a file `scaler_config.yaml` and copy the configuration below,
 substituting the following placeholders:
 
-*   `%FULLY_QUALIFIED_WORKERPOOL_NAME%` - The Kafka consumer workload to be
+*   `%FULLY_QUALIFIED_CONSUMER_NAME%` - The Kafka consumer workload to be
     autoscaled. (Format:
     *projects/`$PROJECT_ID`/locations/`$REGION`/`[workerpools|services]`/`$CONSUMER_SERVICE_NAME`*)
 *   `%TARGET_CPU_UTILIZATION%` - Target CPU utilization for autoscaling
@@ -149,7 +149,7 @@ The following elements must be configured for the Kafka autoscaler to function:
 ```yaml
 spec:
   scaleTargetRef:
-    name: %FULLY_QUALIFIED_WORKERPOOL_NAME%
+    name: %FULLY_QUALIFIED_CONSUMER_NAME%
  metrics:
   - type: Resource
     resource:
@@ -186,7 +186,7 @@ are used.
 ```yaml
 spec:
   scaleTargetRef:
-    name: $FULLY_QUALIFIED_WORKERPOOL_NAME
+    name: %FULLY_QUALIFIED_CONSUMER_NAME%
   metrics:
     - type: Resource
       resource:
