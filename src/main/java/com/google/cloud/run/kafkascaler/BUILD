@@ -141,6 +141,7 @@ java_binary(
     main_class = "com.google.cloud.run.kafkascaler.KafkaScaler",
     runtime_deps = [
         "@maven//:com_google_cloud_hosted_kafka_managed_kafka_auth_login_handler",  # required for connecting to Managed Kafka
+        "@maven//:com_google_flogger_flogger_system_backend",
     ],
     deps = [
         ":configuration_provider",

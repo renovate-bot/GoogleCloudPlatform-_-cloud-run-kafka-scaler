@@ -7,9 +7,12 @@ your Kafka cluster, and uses [manual
 scaling](https://cloud.google.com/run/docs/configuring/services/manual-scaling)
 to scale a Kafka consumer workload based on the Kafka consumer lag metric.
 
-Note: This autoscaler can be used with consumers running on Cloud Run Services
+**Please send any questions or feedback related to this autoscaler to
+run-oss-autoscaler-feedback@google.com**.
+
+*This autoscaler can be used with consumers running on Cloud Run Services
 or the new Worker Pools resource. [Sign-up here](https://forms.gle/n29krenCST6QP1gKA)
-to enroll in the Worker Pools Private Preview.
+to enroll in the Worker Pools Private Preview.*
 
 ## Building the Kafka autoscaler
 
