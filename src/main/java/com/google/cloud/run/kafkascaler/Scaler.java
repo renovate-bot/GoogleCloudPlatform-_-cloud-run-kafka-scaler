@@ -176,21 +176,8 @@ public class Scaler {
         scalingStabilizer.getBoundedRecommendation(
             behavior, now, currentInstanceCount, recommendedInstanceCount);
 
-    // Write metrics here to ensure metrics are written even if we skip the update request.
-    try {
-      metricsService.writeMetric(LAG_METRIC_NAME, (double) currentLag, metricLabels);
-      metricsService.writeMetric(
-          RECOMMENDED_INSTANCE_COUNT_METRIC_NAME, (double) recommendedInstanceCount, metricLabels);
-      metricsService.writeMetric(
-          REQUESTED_INSTANCE_COUNT_METRIC_NAME, (double) newInstanceCount, metricLabels);
-    } catch (RuntimeException ex) {
-      // An exception here is not critical to scaling. Log the exception and continue.
-      // TODO: Make this an WARNING level log when we start using a logging library with that
-      // granularity.
-      System.err.printf(
-          "Failed to write metrics to Cloud Monitoring. Ensure that your service account running"
-              + " Kafka Scaler has the necessary permissions: %s%n",
-          ex.getMessage());
+    if (staticConfig.outputScalerMetrics()) {
+      writeMetrics(currentLag, recommendedInstanceCount, newInstanceCount);
     }
 
     if (newInstanceCount == currentInstanceCount) {
@@ -248,6 +235,21 @@ public class Scaler {
         cloudRunClientWrapper.updateWorkerPoolManualInstances(
             workloadInfo.name(), newInstanceCount);
       }
+    }
+  }
+
+  private void writeMetrics(long currentLag, int recommendedInstanceCount, int newInstanceCount) {
+    try {
+      metricsService.writeMetric(LAG_METRIC_NAME, (double) currentLag, metricLabels);
+      metricsService.writeMetric(
+          RECOMMENDED_INSTANCE_COUNT_METRIC_NAME, (double) recommendedInstanceCount, metricLabels);
+      metricsService.writeMetric(
+          REQUESTED_INSTANCE_COUNT_METRIC_NAME, (double) newInstanceCount, metricLabels);
+    } catch (RuntimeException ex) {
+      // An exception here is not critical to scaling. Log the exception and continue.
+      // TODO: Make this an WARNING level log when we start using a logging library with that
+      // granularity.
+      System.err.printf("Failed to write metrics to Cloud Monitoring: %s%n", ex.getMessage());
     }
   }
 }

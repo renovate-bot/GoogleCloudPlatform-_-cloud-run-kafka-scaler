@@ -81,7 +81,7 @@ administrator to grant you the following IAM roles:
 *   [Security Admin](https://cloud.google.com/iam/docs/understanding-roles#iam.securityAdmin)
 (`roles/iam.securityAdmin`) to grant permissions to service accounts
 
-#### 4. Create Required Secrets 
+#### 4. Create Required Secrets
 
 The autoscaler requires two secrets containing configuration:
 
@@ -305,7 +305,7 @@ Choose the method that best suits your workflow.
 
 This approach uses the `setup_kafka_scaler.sh` script to create and configure the necessary resources.
 
-#### Set Environment Variables 
+#### Set Environment Variables
 
 Before running the script, ensure that you have set **all** the environment variables mentioned below
 
@@ -329,6 +329,8 @@ export SCALER_IMAGE_PATH=<kafka-autoscaler-image-URI>
 export SCALER_CONFIG_SECRET=<kafka-autoscaler-config-secret-name>
 
 export CYCLE_SECONDS=<scaler-check-frequency e.g. 15> # Note: this should be at least 5 seconds
+
+export OUTPUT_SCALER_METRICS=false # If you want scaling metrics to outputted to Cloud Monitoring set this to true and ensure your scaler service account has permission to write metrics (e.g. via roles/monitoring.metricWriter).
 ```
 
 #### Run the Setup Script
@@ -350,7 +352,7 @@ The script performs these actions:
 When run, `setup_kafka_scaler.sh` will output the configured environment
 variables. Please verify they are correct before continuing.
 
-#### Grant Additional Permissions 
+#### Grant Additional Permissions
 In order to change the instance count of the Kafka consumer, the Kafka
 autoscaler service account must have view permission on the deployed container
 image. For example, if the consumer image was deployed from Artifact Registry,
@@ -389,6 +391,8 @@ service URL.
 
 In the logs of your Kafka autoscaler service, you should see messages like
 *There are currently X consumers and Y total lag. Recommending Z consumers.*
+
+If the OUTPUT_SCALER_METRICS flag is enabled, you can also find scaler Cloud Monitoring metrics under `custom.googleapis.com/cloud-run-kafkascaler/`.
 
 ## Reference: Scaling Configuration
 

@@ -47,6 +47,9 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
  */
 class ConfigurationProvider {
 
+  private static final boolean OUTPUT_SCALER_METRICS_DEFAULT = false;
+  private static final boolean USE_MIN_INSTANCES_DEFAULT = false;
+
   // A cycle time greater than or equal to this will be ignored.
   public static final Duration MAX_CYCLE_DURATION = Duration.ofMinutes(1);
 
@@ -58,7 +61,11 @@ class ConfigurationProvider {
    * Static configuration for Kafka Scaler. These fields should only be read at startup, and should
    * not be changed during the lifetime of the application.
    */
-  public record StaticConfig(String topicName, String consumerGroupId, boolean useMinInstances) {}
+  public record StaticConfig(
+      String topicName,
+      String consumerGroupId,
+      boolean useMinInstances,
+      boolean outputScalerMetrics) {}
 
   /** Configuration for self-scheduling. */
   public record SchedulingConfig(
@@ -131,12 +138,17 @@ class ConfigurationProvider {
     String topicName = envProvider.getEnv("KAFKA_TOPIC_ID");
     String consumerGroupId = envProvider.getEnv("CONSUMER_GROUP_ID");
 
-    boolean useMinInstances = false;
+    boolean useMinInstances = USE_MIN_INSTANCES_DEFAULT;
     if (!isNullOrEmpty(envProvider.getEnv("USE_MIN_INSTANCES"))) {
       useMinInstances = Boolean.parseBoolean(envProvider.getEnv("USE_MIN_INSTANCES"));
     }
 
-    return new StaticConfig(topicName, consumerGroupId, useMinInstances);
+    boolean outputScalerMetrics = OUTPUT_SCALER_METRICS_DEFAULT;
+    if (!isNullOrEmpty(envProvider.getEnv("OUTPUT_SCALER_METRICS"))) {
+      outputScalerMetrics = Boolean.parseBoolean(envProvider.getEnv("OUTPUT_SCALER_METRICS"));
+    }
+
+    return new StaticConfig(topicName, consumerGroupId, useMinInstances, outputScalerMetrics);
   }
 
   /**

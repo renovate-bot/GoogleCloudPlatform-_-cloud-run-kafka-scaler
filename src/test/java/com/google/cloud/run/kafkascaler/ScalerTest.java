@@ -19,10 +19,12 @@ package com.google.cloud.run.kafkascaler;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -124,9 +126,17 @@ public final class ScalerTest {
           .build();
 
   private static final ConfigurationProvider.StaticConfig MANUAL_SCALING_STATIC_CONFIG =
-      new ConfigurationProvider.StaticConfig(TOPIC_NAME, CONSUMER_GROUP_ID, false);
+      new ConfigurationProvider.StaticConfig(
+          TOPIC_NAME,
+          CONSUMER_GROUP_ID,
+          /* useMinInstances= */ false,
+          /* outputScalerMetrics= */ false);
   private static final ConfigurationProvider.StaticConfig AUTO_SCALING_STATIC_CONFIG =
-      new ConfigurationProvider.StaticConfig(TOPIC_NAME, CONSUMER_GROUP_ID, true);
+      new ConfigurationProvider.StaticConfig(
+          TOPIC_NAME,
+          CONSUMER_GROUP_ID,
+          /* useMinInstances= */ true,
+          /* outputScalerMetrics= */ false);
 
   private static Optional<Map<TopicPartition, Long>> makeLagPerPartitionMap(
       Map<Integer, Long> lagPerPartition) {
@@ -195,7 +205,11 @@ public final class ScalerTest {
   public void scale_topicDoesNotExist_doesNotCallAnyDependencies()
       throws IOException, InterruptedException, ExecutionException {
     ConfigurationProvider.StaticConfig nonExistentTopicConfig =
-        new ConfigurationProvider.StaticConfig("non-existent-topic", CONSUMER_GROUP_ID, false);
+        new ConfigurationProvider.StaticConfig(
+            "non-existent-topic",
+            CONSUMER_GROUP_ID,
+            /* useMinInstances= */ false,
+            /* outputScalerMetrics= */ true);
     Scaler scaler =
         new Scaler(
             kafka,
@@ -383,6 +397,78 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper)
         .updateServiceManualInstances(SERVICE_WORKLOAD_INFO.name(), newInstanceCount);
     verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
+  }
+
+  @Test
+  public void scale_withOutputMetricsEnabled_outputsMetrics()
+      throws IOException, InterruptedException, ExecutionException {
+
+    ConfigurationProvider.StaticConfig outputMetricsStaticConfig =
+        new ConfigurationProvider.StaticConfig(
+            TOPIC_NAME,
+            CONSUMER_GROUP_ID,
+            /* useMinInstances= */ false,
+            /* outputScalerMetrics= */ true);
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            SERVICE_WORKLOAD_INFO,
+            outputMetricsStaticConfig,
+            configurationProvider);
+
+    int currentInstanceCount = 5;
+    int newInstanceCount = 10;
+
+    when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
+        .thenReturn(currentInstanceCount);
+    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+        .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
+    when(scalingStabilizer.getBoundedRecommendation(
+            eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
+        .thenReturn(newInstanceCount);
+
+    scaler.scale();
+
+    verify(metricsService, times(3)).writeMetric(any(), anyDouble(), any());
+  }
+
+  @Test
+  public void scale_withOutputMetricsDisabled_doesNotOutputMetrics()
+      throws IOException, InterruptedException, ExecutionException {
+
+    ConfigurationProvider.StaticConfig outputMetricsStaticConfig =
+        new ConfigurationProvider.StaticConfig(
+            TOPIC_NAME,
+            CONSUMER_GROUP_ID,
+            /* useMinInstances= */ false,
+            /* outputScalerMetrics= */ false);
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            SERVICE_WORKLOAD_INFO,
+            outputMetricsStaticConfig,
+            configurationProvider);
+
+    int currentInstanceCount = 5;
+    int newInstanceCount = 10;
+
+    when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
+        .thenReturn(currentInstanceCount);
+    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+        .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
+    when(scalingStabilizer.getBoundedRecommendation(
+            eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
+        .thenReturn(newInstanceCount);
+
+    scaler.scale();
+
+    verify(metricsService, never()).writeMetric(any(), anyDouble(), any());
   }
 
   @Test

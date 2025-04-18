@@ -157,6 +157,39 @@ public final class ConfigurationProviderTest {
   }
 
   @Test
+  public void staticConfig_withoutOutputScalerMetricsFlag_returnsOutputScalerMetricsFalse()
+      throws IOException {
+    ConfigurationProvider configuration =
+        new ConfigurationProvider(
+            new FakeEnvProvider(
+                ImmutableMap.of(
+                    "KAFKA_TOPIC_ID", TOPIC_NAME, "CONSUMER_GROUP_ID", CONSUMER_GROUP_ID)),
+            SCALING_CONFIG_FILE);
+
+    ConfigurationProvider.StaticConfig staticConfig = configuration.staticConfig();
+    assertThat(staticConfig.outputScalerMetrics()).isFalse();
+  }
+
+  @Test
+  public void staticConfig_withOutputScalerMetricsFlag_returnsOutputScalerMetricsTrue()
+      throws IOException {
+    ConfigurationProvider configuration =
+        new ConfigurationProvider(
+            new FakeEnvProvider(
+                ImmutableMap.of(
+                    "KAFKA_TOPIC_ID",
+                    TOPIC_NAME,
+                    "CONSUMER_GROUP_ID",
+                    CONSUMER_GROUP_ID,
+                    "OUTPUT_SCALER_METRICS",
+                    "TRUe")), // case-insensitive
+            SCALING_CONFIG_FILE);
+
+    ConfigurationProvider.StaticConfig staticConfig = configuration.staticConfig();
+    assertThat(staticConfig.outputScalerMetrics()).isTrue();
+  }
+
+  @Test
   public void kafkaClientProperties_missingFile_throwsFileNotFoundException() {
     ConfigurationProvider configuration =
         new ConfigurationProvider(new FakeEnvProvider(ImmutableMap.of()), SCALING_CONFIG_FILE);
