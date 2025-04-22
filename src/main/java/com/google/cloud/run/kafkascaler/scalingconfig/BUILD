@@ -16,9 +16,7 @@
 
 # Placeholder: load java_library
 
-package(default_visibility = [
-    "//third_party/java/cloud_run_consumer_lag_scaler:__subpackages__",
-])
+package(default_visibility = ["//visibility:public"])
 
 java_library(
     name = "scaling_config",
