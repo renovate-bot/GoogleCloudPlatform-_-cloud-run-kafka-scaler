@@ -14,11 +14,12 @@
 # limitations under the License.
 #
 
+# Placeholder: load deploy
+# Placeholder: load image
 
-
-
-
-
+# Placeholder: load java_binary
+# Placeholder: load java_library
+# Placeholder: load push
 
 package(default_visibility = ["//visibility:public"])
 
@@ -177,3 +178,4 @@ java_binary(
         "@maven//:com_google_guava_guava",
     ],
 )
+# Placeholder: build targets

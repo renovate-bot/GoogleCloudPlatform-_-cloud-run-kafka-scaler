@@ -14,9 +14,11 @@
 # limitations under the License.
 #
 
+# Placeholder: load java_library
 
-
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = [
+    "//third_party/java/cloud_run_consumer_lag_scaler:__subpackages__",
+])
 
 java_library(
     name = "scaling_config",

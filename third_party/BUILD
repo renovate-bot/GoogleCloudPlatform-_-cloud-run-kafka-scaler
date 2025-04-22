@@ -14,8 +14,8 @@
 # limitations under the License.
 #
 
-
-
+# Placeholder: load java_library
+# Placeholder: load java_plugin
 
 package(default_visibility = ["//visibility:public"])
 

@@ -14,9 +14,9 @@
 # limitations under the License.
 #
 
+# Placeholder: load java_test
 
-
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = ["//visibility:private"])
 
 java_test(
     name = "CloudRunClientWrapperTest",

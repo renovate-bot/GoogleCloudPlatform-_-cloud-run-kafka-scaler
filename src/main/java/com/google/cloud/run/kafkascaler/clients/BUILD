@@ -14,9 +14,12 @@
 # limitations under the License.
 #
 
+# Placeholder: load java client library
+# Placeholder: load java_library
 
-
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = [
+    "//third_party/java/cloud_run_consumer_lag_scaler:__subpackages__",
+])
 
 java_library(
     name = "cloud_tasks_client_wrapper",
@@ -35,6 +38,7 @@ java_library(
     ],
 )
 
+# Placeholder: Cloud Run client library
 java_library(
     name = "cloud_run_client_wrapper",
     srcs = ["CloudRunClientWrapper.java"],
