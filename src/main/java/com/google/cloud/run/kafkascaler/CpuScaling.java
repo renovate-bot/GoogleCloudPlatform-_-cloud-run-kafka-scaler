@@ -17,10 +17,12 @@
 package com.google.cloud.run.kafkascaler;
 
 import com.google.cloud.run.kafkascaler.scalingconfig.MetricTarget;
+import com.google.common.flogger.FluentLogger;
 import java.util.List;
 
 /** A utility class for making scaling recommendations based on CPU utilization. */
 public final class CpuScaling {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private CpuScaling() {}
 
@@ -57,7 +59,7 @@ public final class CpuScaling {
           "Target CPU utilization must be between 0 and 1 but was set to " + targetCpuUtilization);
     }
     if (instanceCountUtilizations == null || instanceCountUtilizations.isEmpty()) {
-      System.out.printf("[CPU] Scaling inactive, no data points found%n");
+      logger.atInfo().log("[CPU] Scaling inactive, no data points found");
       return new Recommendation(false, 0);
     }
 
@@ -73,9 +75,8 @@ public final class CpuScaling {
       if (dataPoint.utilization() > 1
           || dataPoint.utilization() < 0
           || dataPoint.instanceCount() < 0) {
-        // TODO: Make this a DEBUG level log when we start using a logging library with that
-        // granularity.
-        System.out.println("Ignoring invalid instance count-utilization data point: " + dataPoint);
+        logger.atFine().log(
+            "Ignoring invalid instance count-utilization data point: %s", dataPoint);
         continue;
       }
 
@@ -92,16 +93,16 @@ public final class CpuScaling {
 
     int recommendedInstanceCount = (int) Math.ceil(recommendationSum / numDataPoints);
     double averageUtilization = utilizationSum / numDataPoints;
-    System.out.printf(
-        "[CPU] Average utilization: %.3f, upper tolerance %.3f, lower tolerance %.3f%n",
+    logger.atInfo().log(
+        "[CPU] Average utilization: %.3f, upper tolerance %.3f, lower tolerance %.3f",
         averageUtilization, upperTolerance, lowerTolerance);
 
     if (averageUtilization > activationUtilization) {
-      System.out.printf("[CPU] Recommended instance count: %d%n", recommendedInstanceCount);
+      logger.atInfo().log("[CPU] Recommended instance count: %d", recommendedInstanceCount);
       return new Recommendation(true, recommendedInstanceCount);
     } else {
-      System.out.printf(
-          "[CPU] Scaling inactive. Average utilization: %.3f, activation threshold: %.3f%n",
+      logger.atInfo().log(
+          "[CPU] Scaling inactive. Average utilization: %.3f, activation threshold: %.3f",
           averageUtilization, activationUtilization);
       return new Recommendation(false, 0);
     }

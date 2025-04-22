@@ -42,6 +42,7 @@ java_library(
         "@maven//:com_google_api_client_google_api_client_gson",
         "@maven//:com_google_apis_google_api_services_run",
         "@maven//:com_google_auth_google_auth_library_oauth2_http",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_http_client_google_http_client",
         "@maven//:com_google_http_client_google_http_client_gson",
     ],

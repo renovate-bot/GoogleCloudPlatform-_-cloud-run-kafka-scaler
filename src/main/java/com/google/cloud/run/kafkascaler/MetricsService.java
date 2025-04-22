@@ -25,6 +25,7 @@ import com.google.cloud.run.kafkascaler.clients.CloudMonitoringClientWrapper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.FluentLogger;
 import com.google.monitoring.v3.Aggregation;
 import com.google.monitoring.v3.CreateTimeSeriesRequest;
 import com.google.monitoring.v3.ListTimeSeriesRequest;
@@ -47,6 +48,7 @@ import java.util.Optional;
 
 /** Encapsulates the logic of interacting with Cloud Monitoring */
 public class MetricsService {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   /** Record class to hold instance count and utilization data. */
   public record InstanceCountUtilization(double instanceCount, double utilization) {}
@@ -243,16 +245,14 @@ public class MetricsService {
       // We assume that the intervals are aligned as long as there are the same number of data
       // points.
       if (instanceCounts.size() != utilizations.size()) {
-        // TODO: Make this a WARN log level.
-        System.out.printf(
+        logger.atWarning().log(
             "Instance count data size (%d) does not match utilization data size (%d). Instance"
-                + " count data: %s, Utilization data: %s%n",
+                + " count data: %s, Utilization data: %s",
             instanceCounts.size(), utilizations.size(), instanceCounts, utilizations);
         return Optional.empty();
       } else if (instanceCounts.size() != windowDuration.toMinutes()) {
-        // TODO: Make this a WARN log level.
-        System.out.printf(
-            "Metrics Missing: Metrics data size (%d) does not match window minutes (%d)%n",
+        logger.atWarning().log(
+            "Metrics Missing: Metrics data size (%d) does not match window minutes (%d)",
             instanceCounts.size(), windowDuration.toMinutes());
       }
 

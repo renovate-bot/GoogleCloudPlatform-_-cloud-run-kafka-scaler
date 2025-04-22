@@ -24,6 +24,7 @@ import com.google.cloud.tasks.v2.OidcToken;
 import com.google.cloud.tasks.v2.Task;
 import com.google.common.base.Ascii;
 import com.google.common.base.Preconditions;
+import com.google.common.flogger.FluentLogger;
 import com.google.protobuf.Timestamp;
 import java.io.IOException;
 import java.time.Duration;
@@ -37,6 +38,7 @@ import java.util.Map;
  * Enqueuer.
  */
 public final class SelfScheduler {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private static final String SELF_SCHEDULED_HEADER_KEY = "Kafka-Scaler-Self-Scheduled";
 
@@ -73,7 +75,7 @@ public final class SelfScheduler {
    */
   public void scheduleTasks(Instant now, Map<String, String> requestHeaders) {
     if (config.cycleDuration().compareTo(ConfigurationProvider.MAX_CYCLE_DURATION) >= 0) {
-      System.out.println(
+      logger.atInfo().log(
           "Cycle duration is greater than or equal to max cycle duration; skipping additional task"
               + " scheduling.");
       return;
@@ -83,7 +85,7 @@ public final class SelfScheduler {
       try {
         scalerUrl = configProvider.scalerUrl(cloudRunMetadataClient.projectNumberRegion());
       } catch (RuntimeException | IOException e) {
-        System.err.println("[SCHEDULER] Failed to schedule additional tasks: " + e.getMessage());
+        logger.atSevere().withCause(e).log("[SCHEDULER] Failed to schedule additional tasks");
         // It's safe to continue here, we just can't schedule additional tasks. We'll try again on
         // the next non-self-scheduled request.
         return;
@@ -140,8 +142,7 @@ public final class SelfScheduler {
     try {
       var unused = cloudTasks.createTask(config.fullyQualifiedCloudTaskQueueName(), task);
     } catch (RuntimeException ex) {
-      // TODO: Update this to ERROR.
-      System.err.println("Failed to create task: " + ex.getMessage());
+      logger.atSevere().withCause(ex).log("Failed to create task");
     }
   }
 }

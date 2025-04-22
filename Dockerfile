@@ -7,14 +7,16 @@ WORKDIR /workspace
 # Copy project files
 COPY . .
 
-RUN bazel version
-
 # Build the Java binary
 RUN bazel build src/main/java/com/google/cloud/run/kafkascaler:kafka_scaler_binary_deploy.jar
 
 FROM scratch
-WORKDIR /app
+ENV APP_DIR=/app
+WORKDIR $APP_DIR
 
-COPY --from=builder /workspace/bazel-bin/src/main/java/com/google/cloud/run/kafkascaler/kafka_scaler_binary_deploy.jar /app/kafka_scaler.jar
+COPY --from=builder /workspace/src/main/java/com/google/cloud/run/kafkascaler/logging.properties $APP_DIR/logging.properties
+COPY --from=builder /workspace/bazel-bin/src/main/java/com/google/cloud/run/kafkascaler/kafka_scaler_binary_deploy.jar $APP_DIR/kafka_scaler.jar
+
+ENV JAVA_TOOL_OPTIONS="-Djava.util.logging.config.file=$APP_DIR/logging.properties"
 
 CMD ["java", "-jar", "/app/kafka_scaler.jar"]

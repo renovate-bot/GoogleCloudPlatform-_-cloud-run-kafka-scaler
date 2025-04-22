@@ -26,6 +26,7 @@ import com.google.cloud.run.kafkascaler.scalingconfig.Parser;
 import com.google.cloud.run.kafkascaler.scalingconfig.ScalingConfig;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.flogger.FluentLogger;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -46,6 +47,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
  * Kafka Scaler.
  */
 class ConfigurationProvider {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private static final boolean OUTPUT_SCALER_METRICS_DEFAULT = false;
   private static final boolean USE_MIN_INSTANCES_DEFAULT = false;
@@ -163,7 +165,7 @@ class ConfigurationProvider {
     try (InputStream inputStream = new FileInputStream(kafkaClientPropertiesFile)) {
       return kafkaClientProperties(inputStream);
     } catch (IOException e) {
-      System.err.println("Unable to load client properties file " + kafkaClientPropertiesFile);
+      logger.atSevere().log("Unable to load client properties file %s ", kafkaClientPropertiesFile);
       throw e;
     }
   }
@@ -256,7 +258,7 @@ class ConfigurationProvider {
             .spec(scalingConfig.spec().toBuilder().behavior(behavior).build())
             .build();
 
-    System.out.println("Current scaling config: " + finalScalingConfig);
+    logger.atInfo().log("Current scaling config: %s", finalScalingConfig);
     return finalScalingConfig;
   }
 

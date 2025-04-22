@@ -20,6 +20,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.base.Utf8;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.FluentLogger;
 import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -29,6 +30,7 @@ import java.util.Map;
 
 /** Utility class for sending HTTP responses. */
 final class RequestResponseHandler {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private RequestResponseHandler() {}
 
@@ -59,8 +61,7 @@ final class RequestResponseHandler {
       os.write(response.getBytes(UTF_8));
     } catch (IOException io) {
       // Processing has already completed. Just log the error.
-      System.err.println("Failed while writing response: " + io.getMessage());
-      io.printStackTrace();
+      logger.atWarning().withCause(io).log("Failed while writing response");
     }
   }
 
@@ -77,8 +78,7 @@ final class RequestResponseHandler {
       os.write(response.getBytes(UTF_8));
     } catch (IOException io) {
       // Processing has already completed. Just log the error.
-      System.err.println("Failed while writing successful response: " + io.getMessage());
-      io.printStackTrace();
+      logger.atWarning().withCause(io).log("Failed while writing successful response");
     }
   }
 }

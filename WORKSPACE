@@ -41,6 +41,7 @@ load("@rules_jvm_external//:defs.bzl", "maven_install")
 CLOUD_TASKS_PROTO_VERSION = "2.58.0"
 CLOUD_MONITORING_PROTO_VERSION = "3.61.0"
 PROTOBUF_VERSION = "4.29.3"
+FLOGGER_VERSION = "0.8"
 
 MAVEN_ARTIFACTS = [
     "com.google.api.grpc:proto-google-cloud-monitoring-v3:" + CLOUD_MONITORING_PROTO_VERSION,
@@ -55,6 +56,8 @@ MAVEN_ARTIFACTS = [
     "com.google.cloud:google-cloud-tasks:" + CLOUD_TASKS_PROTO_VERSION,
     "com.google.cloud.hosted.kafka:managed-kafka-auth-login-handler:1.0.5",
     "com.google.code.findbugs:jsr305:3.0.2",
+    "com.google.flogger:flogger:" + FLOGGER_VERSION,
+    "com.google.flogger:flogger-system-backend:" + FLOGGER_VERSION,
     "com.google.guava:guava:32.1.3-jre",
     "com.google.http-client:google-http-client:1.46.3",
     "com.google.http-client:google-http-client-gson:1.46.3", # We need this otherwise strict deps complains about using an indirect dependency for GsonFactory

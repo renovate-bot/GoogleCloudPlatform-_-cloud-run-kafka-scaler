@@ -26,6 +26,7 @@ import com.google.cloud.run.kafkascaler.scalingconfig.ScalingConfig;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.FluentLogger;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,6 +45,7 @@ import org.apache.kafka.common.TopicPartition;
  * <p>Caller is expected to handle translating exceptions into HTTP responses.
  */
 public class Scaler {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private static final String LAG_METRIC_NAME = "lag";
   private static final String RECOMMENDED_INSTANCE_COUNT_METRIC_NAME = "recommended_instance_count";
@@ -103,7 +105,7 @@ public class Scaler {
 
     int currentInstanceCount =
         InstanceCountProvider.getInstanceCount(cloudRunClientWrapper, workloadInfo);
-    System.out.printf("[SCALING] Current instances: %d%n", currentInstanceCount);
+    logger.atInfo().log("[SCALING] Current instances: %d", currentInstanceCount);
 
     // Current lag should never be empty here because we already checked that the topic exists.
     Map<TopicPartition, Long> lagPerPartition =
@@ -132,8 +134,8 @@ public class Scaler {
     }
 
     if (lagTarget == null && cpuTarget == null) {
-      System.err.println(
-          "[SCALING] No scaling metric configured. At east one scaling metric must be"
+      logger.atSevere().log(
+          "[SCALING] No scaling metric configured. At least one scaling metric must be"
               + " configured to enable autoscaling.");
       return;
     }
@@ -164,9 +166,7 @@ public class Scaler {
 
     if (recommendedInstanceCount > lagPerPartition.size()) {
       recommendedInstanceCount = lagPerPartition.size();
-      // TODO: Make this a WARNING level log when we start using a logging library with that
-      // granularity.
-      System.out.printf(
+      logger.atWarning().log(
           "The recommended number of instances (%d) is greater than the number of partitions"
               + " (%d). The recommendation will be limited to the number of partitions.",
           recommendedInstanceCount, lagPerPartition.size());
@@ -182,20 +182,20 @@ public class Scaler {
 
     if (newInstanceCount == currentInstanceCount) {
       // Skip update request if the number of instances is unchanged.
-      System.out.printf("[SCALING] No change in recommended instances (%d)%n", newInstanceCount);
+      logger.atInfo().log("[SCALING] No change in recommended instances (%d)", newInstanceCount);
       return;
     }
 
     Instant nextUpdateAllowedTime = getNextUpdateAllowedTime(behavior);
     if (Instant.now().isAfter(nextUpdateAllowedTime)) {
       updateInstanceCount(newInstanceCount);
-      System.out.printf("[SCALING] Recommended instances: %d%n", newInstanceCount);
+      logger.atInfo().log("[SCALING] Recommended instances: %d", newInstanceCount);
       scalingStabilizer.markScaleEvent(behavior, now, currentInstanceCount, newInstanceCount);
     } else {
       // Rate limited due to cooldown period
-      System.out.printf(
-          "[SCALING] Within cooldown, no change. Next update allowed at: %s%n",
-          nextUpdateAllowedTime.toString());
+      logger.atInfo().log(
+          "[SCALING] Within cooldown, no change. Next update allowed at: %s",
+          nextUpdateAllowedTime);
     }
   }
 
@@ -247,9 +247,7 @@ public class Scaler {
           REQUESTED_INSTANCE_COUNT_METRIC_NAME, (double) newInstanceCount, metricLabels);
     } catch (RuntimeException ex) {
       // An exception here is not critical to scaling. Log the exception and continue.
-      // TODO: Make this an WARNING level log when we start using a logging library with that
-      // granularity.
-      System.err.printf("Failed to write metrics to Cloud Monitoring: %s%n", ex.getMessage());
+      logger.atWarning().withCause(ex).log("Failed to write metrics to Cloud Monitoring.");
     }
   }
 }

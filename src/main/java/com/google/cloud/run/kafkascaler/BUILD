@@ -27,6 +27,7 @@ java_library(
     srcs = ["ScalingStabilizer.java"],
     deps = [
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
     ],
 )
 
@@ -43,6 +44,7 @@ java_library(
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_metadata_client",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_tasks_client_wrapper",
         "@maven//:com_google_api_grpc_proto_google_cloud_tasks_v2",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
     ],
@@ -62,6 +64,7 @@ java_library(
         ":workload_info_parser",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_run_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_guava_guava",
         "@maven//:org_apache_kafka_kafka_clients",
     ],
@@ -72,6 +75,7 @@ java_library(
     srcs = ["LagScaling.java"],
     deps = [
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
     ],
 )
 
@@ -81,6 +85,7 @@ java_library(
     deps = [
         ":metrics_service",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
     ],
 )
 
@@ -102,6 +107,7 @@ java_library(
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:merger",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:parser",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_guava_guava",
         "@maven//:org_apache_kafka_kafka_clients",
     ],
@@ -110,7 +116,10 @@ java_library(
 java_library(
     name = "request_response_handler",
     srcs = ["RequestResponseHandler.java"],
-    deps = ["@maven//:com_google_guava_guava"],
+    deps = [
+        "@maven//:com_google_flogger_flogger",
+        "@maven//:com_google_guava_guava",
+    ],
 )
 
 java_library(
@@ -130,6 +139,7 @@ java_library(
         "@maven//:com_google_api_grpc_proto_google_cloud_monitoring_v3",
         "@maven//:com_google_api_grpc_proto_google_common_protos",
         "@maven//:com_google_cloud_google_cloud_monitoring",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
     ],
@@ -138,6 +148,10 @@ java_library(
 java_binary(
     name = "kafka_scaler_binary",
     srcs = ["KafkaScaler.java"],
+    data = [
+        "logging.properties",
+    ],
+    jvm_flags = ["-Djava.util.logging.config.file=src/main/java/com/google/cloud/run/kafkascaler/logging.properties"],
     main_class = "com.google.cloud.run.kafkascaler.KafkaScaler",
     runtime_deps = [
         "@maven//:com_google_cloud_hosted_kafka_managed_kafka_auth_login_handler",  # required for connecting to Managed Kafka
@@ -159,6 +173,7 @@ java_binary(
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:cloud_tasks_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/clients:kafka_admin_client_wrapper",
         "//src/main/java/com/google/cloud/run/kafkascaler/scalingconfig:scaling_config",
+        "@maven//:com_google_flogger_flogger",
         "@maven//:com_google_guava_guava",
     ],
 )

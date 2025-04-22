@@ -23,6 +23,7 @@ import com.google.cloud.run.kafkascaler.clients.CloudTasksClientWrapper;
 import com.google.cloud.run.kafkascaler.clients.KafkaAdminClientWrapper;
 import com.google.cloud.run.kafkascaler.scalingconfig.ScalingConfig;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.flogger.FluentLogger;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -41,6 +42,8 @@ import java.util.concurrent.ExecutionException;
  * necessary.
  */
 final class KafkaScaler {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+
   private static final String APPLICATION_NAME = "Cloud Run Kafka Scaler";
   private static final int CLOUD_RUN_DEFAULT_PORT = 8080;
 
@@ -119,8 +122,7 @@ final class KafkaScaler {
       } catch (IOException | ExecutionException | InterruptedException e) {
         RequestResponseHandler.sendFailureResponse(exchange, e);
       } catch (RuntimeException e) {
-        // TODO: Log this as ERROR when we use a logger.
-        System.out.println("Caught unchecked RuntimeException: " + e.getMessage());
+        logger.atSevere().log("Caught unchecked RuntimeException: %s", e.getMessage());
         e.printStackTrace();
         RequestResponseHandler.sendFailureResponse(exchange, e);
       }

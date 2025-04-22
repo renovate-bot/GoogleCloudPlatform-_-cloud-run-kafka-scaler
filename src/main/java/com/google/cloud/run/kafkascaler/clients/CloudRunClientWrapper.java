@@ -26,14 +26,16 @@ import com.google.api.services.run.v2.model.GoogleCloudRunV2WorkerPoolScaling;
 import com.google.api.services.run.v2.model.GoogleLongrunningOperation;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.common.flogger.FluentLogger;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 
 /** Thin wrapper around Cloud Run API */
 public class CloudRunClientWrapper {
-  private static final String CLOUD_RUN_ROOT_URL = "https://run.googleapis.com/";
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
+  private static final String CLOUD_RUN_ROOT_URL = "https://run.googleapis.com/";
   private final CloudRun cloudRun;
   private final String projectId;
   private final String region;
@@ -141,8 +143,8 @@ public class CloudRunClientWrapper {
       throw new IOException(
           "Request failed to Cloud Run to update workerpool instances: " + operation.getError());
     } else {
-      System.out.printf(
-          "Sent update workerpool request to set instances to %d for workerpool %s%n",
+      logger.atInfo().log(
+          "Sent update workerpool request to set instances to %d for workerpool %s",
           instances, workerpoolName);
     }
   }
@@ -181,8 +183,8 @@ public class CloudRunClientWrapper {
       throw new IOException(
           "Request failed to Cloud Run to update workerpool instances: " + operation.getError());
     } else {
-      System.out.printf(
-          "Sent update workerpool request to set instances to %d for workerpool %s%n",
+      logger.atInfo().log(
+          "Sent update workerpool request to set instances to %d for workerpool %s",
           instances, workerpoolName);
     }
   }
@@ -222,7 +224,6 @@ public class CloudRunClientWrapper {
    */
   public Instant getServiceLastDeploymentTime(String serviceName) throws IOException {
     GoogleCloudRunV2Service service = getService(serviceName);
-    System.out.println(service.getUpdateTime());
     return service.getUpdateTime() == null ? Instant.EPOCH : Instant.parse(service.getUpdateTime());
   }
 
@@ -264,8 +265,8 @@ public class CloudRunClientWrapper {
       throw new IOException(
           "Request failed to Cloud Run to update service instances: " + operation.getError());
     } else {
-      System.out.printf(
-          "Sent update service request to set instances to %d for service %s%n",
+      logger.atInfo().log(
+          "Sent update service request to set instances to %d for service %s",
           instances, serviceName);
     }
   }
@@ -304,8 +305,8 @@ public class CloudRunClientWrapper {
       throw new IOException(
           "Request failed to Cloud Run to update service instances: " + operation.getError());
     } else {
-      System.out.printf(
-          "Sent update service request to set instances to %d for service %s%n",
+      logger.atInfo().log(
+          "Sent update service request to set instances to %d for service %s",
           instances, serviceName);
     }
   }

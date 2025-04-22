@@ -19,6 +19,7 @@ package com.google.cloud.run.kafkascaler;
 import static java.lang.Math.max;
 
 import com.google.cloud.run.kafkascaler.scalingconfig.MetricTarget;
+import com.google.common.flogger.FluentLogger;
 
 /**
  * Scaling based on lag and the lag threshold.
@@ -28,6 +29,7 @@ import com.google.cloud.run.kafkascaler.scalingconfig.MetricTarget;
  * the current instance count.
  */
 public final class LagScaling {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
 
   private LagScaling() {}
 
@@ -51,8 +53,8 @@ public final class LagScaling {
   public static Recommendation makeRecommendation(
       MetricTarget lagTarget, int currentInstanceCount, long currentLag) {
     if (currentLag <= lagTarget.activationThreshold()) {
-      System.out.printf(
-          "[LAG] Scaling inactive, current lag: %d, activation lag threshold: %d%n",
+      logger.atInfo().log(
+          "[LAG] Scaling inactive, current lag: %d, activation lag threshold: %d",
           currentLag, lagTarget.activationThreshold());
       return new Recommendation(false, 0);
     }
@@ -61,15 +63,15 @@ public final class LagScaling {
     double scalingFactor = currentLag / (double) lagTarget.averageValue();
     double upperTolerance = (1 + lagTarget.tolerance()) * lagTarget.averageValue();
     double lowerTolerance = (1 - lagTarget.tolerance()) * lagTarget.averageValue();
-    System.out.printf(
+    logger.atInfo().log(
         "[LAG] Current Lag: %d, upper tolerance: %.2f, lower tolerance: %.2f\n",
         currentLag, upperTolerance, lowerTolerance);
 
     if (currentLag <= upperTolerance && currentLag >= lowerTolerance) {
-      System.out.printf("[LAG] Within tolerance, no change%n");
+      logger.atInfo().log("[LAG] Within tolerance, no change");
     } else {
       recommendedInstanceCount = (int) Math.ceil(max(currentInstanceCount, 1) * scalingFactor);
-      System.out.printf("[LAG] Recommended instance count: %d%n", recommendedInstanceCount);
+      logger.atInfo().log("[LAG] Recommended instance count: %d", recommendedInstanceCount);
     }
 
     return new Recommendation(true, recommendedInstanceCount);

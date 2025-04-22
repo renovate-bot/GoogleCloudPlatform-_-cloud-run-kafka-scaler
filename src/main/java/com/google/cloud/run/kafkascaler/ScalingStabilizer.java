@@ -23,6 +23,7 @@ import static java.util.Comparator.naturalOrder;
 import com.google.cloud.run.kafkascaler.scalingconfig.Behavior;
 import com.google.cloud.run.kafkascaler.scalingconfig.Policy;
 import com.google.cloud.run.kafkascaler.scalingconfig.Scaling;
+import com.google.common.flogger.FluentLogger;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -45,6 +46,8 @@ import java.util.function.BiFunction;
  * periods specified in the config for mins and maxes to determine bounds.
  */
 public class ScalingStabilizer {
+  private static final FluentLogger logger = FluentLogger.forEnclosingClass();
+
   private static class BoundsDebugInfo {
 
     private final List<String> scaleUp = new ArrayList<>();
@@ -167,8 +170,8 @@ public class ScalingStabilizer {
           getBoundedRecommendationForScaleUp(
               behavior, time, currentInstanceCount, recommendedInstances, bounds);
       if (boundedRecommendation < recommendedInstances) {
-        System.out.printf(
-            "ScalingStabilizer: scale up is bounded down to %d from the recommendation of %d\n",
+        logger.atInfo().log(
+            "ScalingStabilizer: scale up is bounded down to %d from the recommendation of %d",
             boundedRecommendation, recommendedInstances);
       }
     } else if (recommendedInstances < currentInstanceCount) {
@@ -176,8 +179,8 @@ public class ScalingStabilizer {
           getBoundedRecommendationForScaleDown(
               behavior, time, currentInstanceCount, recommendedInstances, bounds);
       if (boundedRecommendation > recommendedInstances) {
-        System.out.printf(
-            "ScalingStabilizer: scale down is bounded up to %d from the recommendation of %d\n",
+        logger.atInfo().log(
+            "ScalingStabilizer: scale down is bounded up to %d from the recommendation of %d",
             boundedRecommendation, recommendedInstances);
       }
     }
@@ -186,9 +189,9 @@ public class ScalingStabilizer {
     recommendations.add(new DataPoint(time, recommendedInstances));
 
     if (recommendedInstances > currentInstanceCount) {
-      System.out.println(bounds.toScaleUpBoundDebugString());
+      logger.atInfo().log("%s", bounds.toScaleUpBoundDebugString());
     } else if (recommendedInstances < currentInstanceCount) {
-      System.out.println(bounds.toScaleDownBoundDebugString());
+      logger.atInfo().log("%s", bounds.toScaleDownBoundDebugString());
     }
 
     return boundedRecommendation;
