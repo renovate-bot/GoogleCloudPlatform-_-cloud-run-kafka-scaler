@@ -21,7 +21,7 @@ package(default_visibility = ["//visibility:private"])
 filegroup(
     name = "data_files",
     srcs = ["scaling.yaml"],
-    visibility = ["//third_party/java/cloud_run_consumer_lag_scaler:__subpackages__"],
+    visibility = ["//third_party/java/foo:private"],
 )
 
 java_test(
