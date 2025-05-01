@@ -18,12 +18,6 @@
 
 package(default_visibility = ["//visibility:private"])
 
-filegroup(
-    name = "data_files",
-    srcs = ["scaling.yaml"],
-    visibility = ["//third_party/java/foo:private"],
-)
-
 java_test(
     name = "ParserTest",
     srcs = ["ParserTest.java"],
