@@ -25,7 +25,7 @@ final class InstanceCountProvider {
   private InstanceCountProvider() {}
 
   /**
-   * Gets the instance count for a given workload.
+   * Gets the last requested instance count for a given workload.
    *
    * @param cloudRunClient The Cloud Run client.
    * @param workloadInfo The workload info.

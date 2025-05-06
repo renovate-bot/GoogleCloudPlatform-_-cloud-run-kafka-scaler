@@ -186,6 +186,7 @@ public final class ScalerTest {
 
     int currentInstanceCount = 5;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -224,6 +225,37 @@ public final class ScalerTest {
 
     verify(cloudRunClientWrapper, never()).getServiceInstanceCount(any());
     verify(cloudRunClientWrapper, never()).getWorkerPoolInstanceCount(any());
+    verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
+    verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
+    verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
+    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
+
+    verify(kafka, never()).getLagPerPartition(any(), any());
+
+    verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
+  }
+
+  @Test
+  public void
+      scale_currentInstanceCountDoesNotMatchRequestedInstanceCount_doesNotCallAnyDependencies()
+          throws IOException, InterruptedException, ExecutionException {
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            SERVICE_WORKLOAD_INFO,
+            MANUAL_SCALING_STATIC_CONFIG,
+            configurationProvider);
+
+
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(0);
+    when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
+        .thenReturn(5);
+
+    scaler.scale();
+
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
@@ -351,6 +383,7 @@ public final class ScalerTest {
 
     int currentInstanceCount = 5;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -384,6 +417,7 @@ public final class ScalerTest {
     int currentInstanceCount = 5;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -422,6 +456,7 @@ public final class ScalerTest {
     int currentInstanceCount = 5;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -458,6 +493,7 @@ public final class ScalerTest {
     int currentInstanceCount = 5;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -487,6 +523,7 @@ public final class ScalerTest {
     int currentInstanceCount = 25;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -518,6 +555,7 @@ public final class ScalerTest {
     int currentInstanceCount = 5;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -549,6 +587,7 @@ public final class ScalerTest {
     int currentInstanceCount = 25;
     int newInstanceCount = 10;
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -583,6 +622,7 @@ public final class ScalerTest {
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 1000L, 2, 2000L));
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
@@ -639,7 +679,7 @@ public final class ScalerTest {
     int currentInstanceCount = 25;
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 0L));
-
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
@@ -843,6 +883,7 @@ public final class ScalerTest {
                     new MetricsService.InstanceCountUtilization(3, .4))));
 
     int currentInstanceCount = 5;
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -901,6 +942,7 @@ public final class ScalerTest {
                     new MetricsService.InstanceCountUtilization(3, .4))));
 
     int currentInstanceCount = 5;
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -962,6 +1004,7 @@ public final class ScalerTest {
                     new MetricsService.InstanceCountUtilization(3, .4))));
 
     int currentInstanceCount = 5;
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
@@ -999,6 +1042,7 @@ public final class ScalerTest {
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 1000L, 2, 2000L));
 
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
@@ -1059,6 +1103,7 @@ public final class ScalerTest {
         .thenReturn(Optional.of(ImmutableList.of()));
 
     int currentInstanceCount = 5;
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     // Return 0 lag. This makes lag scaling inactive.

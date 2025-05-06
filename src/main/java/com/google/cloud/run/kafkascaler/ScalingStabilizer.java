@@ -38,8 +38,7 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * Class to be used by Kafka Scaler to determine apply bounds to scaling up/down based on the
- * provided scaling config.
+ * Class to apply bounds to scaling up/down based on the provided scaling config.
  *
  * <p>Scaling is stabilized relative to the mins and maxes of the period. This class's consumers are
  * responsible for marking recommendation and instance counts, and this class will look back for the

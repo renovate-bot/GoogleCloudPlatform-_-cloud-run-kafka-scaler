@@ -103,8 +103,17 @@ public class Scaler {
           String.format("The specified topic \"%s\" does not exist.", staticConfig.topicName()));
     }
 
-    int currentInstanceCount =
+    int lastRequestedInstanceCount =
         InstanceCountProvider.getInstanceCount(cloudRunClientWrapper, workloadInfo);
+    int currentInstanceCount = kafka.getCurrentConsumerCount(staticConfig.consumerGroupId());
+
+    if (currentInstanceCount != lastRequestedInstanceCount) {
+      logger.atInfo().log(
+          "[SCALING] Waiting until current instances (%d) matches requested instances (%d).",
+          currentInstanceCount, lastRequestedInstanceCount);
+      return;
+    }
+
     logger.atInfo().log("[SCALING] Current instances: %d", currentInstanceCount);
 
     // Current lag should never be empty here because we already checked that the topic exists.
