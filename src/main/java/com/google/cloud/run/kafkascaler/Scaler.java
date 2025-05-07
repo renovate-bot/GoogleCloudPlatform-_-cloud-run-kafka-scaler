@@ -174,11 +174,11 @@ public class Scaler {
                 : 0);
 
     if (recommendedInstanceCount > lagPerPartition.size()) {
-      recommendedInstanceCount = lagPerPartition.size();
       logger.atWarning().log(
           "The recommended number of instances (%d) is greater than the number of partitions"
               + " (%d). The recommendation will be limited to the number of partitions.",
           recommendedInstanceCount, lagPerPartition.size());
+      recommendedInstanceCount = lagPerPartition.size();
     }
 
     int newInstanceCount =
