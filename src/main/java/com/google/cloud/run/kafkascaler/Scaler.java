@@ -249,10 +249,10 @@ public class Scaler {
 
   private void writeMetrics(long currentLag, int recommendedInstanceCount, int newInstanceCount) {
     try {
-      metricsService.writeMetric(LAG_METRIC_NAME, (double) currentLag, metricLabels);
-      metricsService.writeMetric(
+      metricsService.writeMetricIgnoreFailure(LAG_METRIC_NAME, (double) currentLag, metricLabels);
+      metricsService.writeMetricIgnoreFailure(
           RECOMMENDED_INSTANCE_COUNT_METRIC_NAME, (double) recommendedInstanceCount, metricLabels);
-      metricsService.writeMetric(
+      metricsService.writeMetricIgnoreFailure(
           REQUESTED_INSTANCE_COUNT_METRIC_NAME, (double) newInstanceCount, metricLabels);
     } catch (RuntimeException ex) {
       // An exception here is not critical to scaling. Log the exception and continue.

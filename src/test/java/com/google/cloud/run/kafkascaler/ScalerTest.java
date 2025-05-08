@@ -467,7 +467,7 @@ public final class ScalerTest {
 
     scaler.scale();
 
-    verify(metricsService, times(3)).writeMetric(any(), anyDouble(), any());
+    verify(metricsService, times(3)).writeMetricIgnoreFailure(any(), anyDouble(), any());
   }
 
   @Test
@@ -504,7 +504,7 @@ public final class ScalerTest {
 
     scaler.scale();
 
-    verify(metricsService, never()).writeMetric(any(), anyDouble(), any());
+    verify(metricsService, never()).writeMetricIgnoreFailure(any(), anyDouble(), any());
   }
 
   @Test

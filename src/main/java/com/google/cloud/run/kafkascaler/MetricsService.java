@@ -72,13 +72,14 @@ public class MetricsService {
   }
 
   /**
-   * Writes a custom gauge metric to Cloud Monitoring.
+   * Writes a custom gauge metric to Cloud Monitoring ignoring any failures.
    *
    * @param metricName The name of the custom metric.
    * @param value The value of the metric.
    * @param metricLabels A map of labels for the metric.
    */
-  public void writeMetric(String metricName, double value, Map<String, String> metricLabels) {
+  public void writeMetricIgnoreFailure(
+      String metricName, double value, Map<String, String> metricLabels) {
     if (Strings.isNullOrEmpty(metricName)) {
       throw new IllegalArgumentException("metricName cannot be null or empty.");
     }
@@ -117,7 +118,13 @@ public class MetricsService {
             .addAllTimeSeries(timeSeriesList)
             .build();
 
-    cloudMonitoringClient.createTimeSeries(request);
+    try {
+      cloudMonitoringClient.createTimeSeries(request);
+    } catch (RuntimeException e) {
+      // Exceptions may occur if emitting metrics too frequently i.e. for frequently invoked scaler
+      // or even on instance restart.
+      logger.atFine().log("Failed to create time series: %s", e.getMessage());
+    }
   }
 
   /**

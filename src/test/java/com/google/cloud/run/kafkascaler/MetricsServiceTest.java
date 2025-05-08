@@ -19,6 +19,7 @@ package com.google.cloud.run.kafkascaler;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,22 +86,38 @@ public final class MetricsServiceTest {
   }
 
   @Test
-  public void writeMetric_withoutMetricName_throwsIllegalArgumentException() {
+  public void writeMetricIgnoreFailure_withoutMetricName_throwsIllegalArgumentException() {
     assertThrows(
         IllegalArgumentException.class,
-        () -> metricsService.writeMetric(null, 1.0, ImmutableMap.of()));
+        () -> metricsService.writeMetricIgnoreFailure(null, 1.0, ImmutableMap.of()));
     assertThrows(
         IllegalArgumentException.class,
-        () -> metricsService.writeMetric("", 1.0, ImmutableMap.of()));
+        () -> metricsService.writeMetricIgnoreFailure("", 1.0, ImmutableMap.of()));
   }
 
   @Test
-  public void writeMetric_writesGaugeMetric() throws IOException {
+  public void writeMetricIgnoreFailure_createTimeSeriesThrowsException_doesNotThrow()
+      throws IOException {
     String metricName = "test_metric";
     double value = 1.0;
     ImmutableMap<String, String> metricLabels = ImmutableMap.of("test_label", "test_value");
 
-    metricsService.writeMetric(metricName, value, metricLabels);
+    doThrow(new RuntimeException()).when(cloudMonitoringClientWrapper).createTimeSeries(any());
+
+    try {
+      metricsService.writeMetricIgnoreFailure(metricName, value, metricLabels);
+    } catch (RuntimeException e) {
+      throw new AssertionError("Expected no exception to be thrown.", e);
+    }
+  }
+
+  @Test
+  public void writeMetricIgnoreFailure_writesGaugeMetric() throws IOException {
+    String metricName = "test_metric";
+    double value = 1.0;
+    ImmutableMap<String, String> metricLabels = ImmutableMap.of("test_label", "test_value");
+
+    metricsService.writeMetricIgnoreFailure(metricName, value, metricLabels);
     verify(cloudMonitoringClientWrapper).createTimeSeries(createTimeSeriesRequestCaptor.capture());
 
     CreateTimeSeriesRequest actual = createTimeSeriesRequestCaptor.getValue();
@@ -119,11 +136,11 @@ public final class MetricsServiceTest {
   }
 
   @Test
-  public void writeMetric_withNullLabels_writesGaugeMetric() throws IOException {
+  public void writeMetricIgnoreFailure_withNullLabels_writesGaugeMetric() throws IOException {
     String metricName = "test_metric";
     double value = 1.0;
 
-    metricsService.writeMetric(metricName, value, null);
+    metricsService.writeMetricIgnoreFailure(metricName, value, null);
     verify(cloudMonitoringClientWrapper).createTimeSeries(createTimeSeriesRequestCaptor.capture());
 
     CreateTimeSeriesRequest actual = createTimeSeriesRequestCaptor.getValue();
