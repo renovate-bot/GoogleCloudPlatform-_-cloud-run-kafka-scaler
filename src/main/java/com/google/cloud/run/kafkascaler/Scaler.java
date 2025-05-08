@@ -84,6 +84,12 @@ public class Scaler {
         Preconditions.checkNotNull(configProvider, "Config provider cannot be null.");
 
     this.metricLabels = ImmutableMap.of("consumer_service", workloadInfo.name());
+
+    if (workloadInfo.workloadType() == WorkloadInfoParser.WorkloadType.WORKERPOOL
+        && staticConfig.useMinInstances()) {
+      throw new IllegalArgumentException(
+          "USE_MIN_INSTANCES is not supported for worker pool workloads.");
+    }
   }
 
   /**
@@ -235,7 +241,9 @@ public class Scaler {
       if (workloadInfo.workloadType() == WorkloadInfoParser.WorkloadType.SERVICE) {
         cloudRunClientWrapper.updateServiceMinInstances(workloadInfo.name(), newInstanceCount);
       } else {
-        cloudRunClientWrapper.updateWorkerPoolMinInstances(workloadInfo.name(), newInstanceCount);
+        // We should never realistically get here because we should have checked against this in
+        // the constructor.
+        throw new IllegalArgumentException("Min instances are not supported for worker pools.");
       }
     } else {
       if (workloadInfo.workloadType() == WorkloadInfoParser.WorkloadType.SERVICE) {

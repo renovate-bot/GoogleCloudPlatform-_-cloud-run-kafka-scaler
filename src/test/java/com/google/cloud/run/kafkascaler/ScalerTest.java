@@ -165,6 +165,21 @@ public final class ScalerTest {
   }
 
   @Test
+  public void constructor_minInstancesForWorkerPool_throwsIllegalArgumentException() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new Scaler(
+                kafka,
+                scalingStabilizer,
+                cloudRunClientWrapper,
+                metricsService,
+                WORKERPOOL_WORKLOAD_INFO,
+                AUTO_SCALING_STATIC_CONFIG,
+                configurationProvider));
+  }
+
+  @Test
   public void scale_noMetricsConfigured_doesNotChangeInstanceCount()
       throws IOException, InterruptedException, ExecutionException {
     Scaler scaler =
@@ -197,7 +212,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
 
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
@@ -228,7 +242,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
 
     verify(kafka, never()).getLagPerPartition(any(), any());
 
@@ -259,7 +272,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
 
     verify(kafka, never()).getLagPerPartition(any(), any());
 
@@ -285,7 +297,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
 
@@ -311,7 +322,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
 
@@ -337,7 +347,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
 
@@ -364,7 +373,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
 
@@ -397,7 +405,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolMinInstances(any(), anyInt());
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
 
@@ -568,38 +575,6 @@ public final class ScalerTest {
 
     verify(cloudRunClientWrapper)
         .updateServiceMinInstances(SERVICE_WORKLOAD_INFO.name(), newInstanceCount);
-    verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
-  }
-
-  @Test
-  public void scale_withBoundedRecommendation_updatesWorkerpoolMinInstanceCount()
-      throws IOException, InterruptedException, ExecutionException {
-    Scaler scaler =
-        new Scaler(
-            kafka,
-            scalingStabilizer,
-            cloudRunClientWrapper,
-            metricsService,
-            WORKERPOOL_WORKLOAD_INFO,
-            AUTO_SCALING_STATIC_CONFIG,
-            configurationProvider);
-
-    int currentInstanceCount = 25;
-    int newInstanceCount = 10;
-
-    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
-    when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
-        .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
-        .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
-    when(scalingStabilizer.getBoundedRecommendation(
-            eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
-        .thenReturn(newInstanceCount);
-
-    scaler.scale();
-
-    verify(cloudRunClientWrapper)
-        .updateWorkerPoolMinInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
     verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
   }
 

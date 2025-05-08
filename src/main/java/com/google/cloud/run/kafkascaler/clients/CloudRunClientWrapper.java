@@ -82,12 +82,7 @@ public class CloudRunClientWrapper {
       return 0;
     }
 
-    if (scaling.getScalingMode() != null && scaling.getScalingMode().equals(MANUAL_SCALING_MODE)) {
-      return scaling.getManualInstanceCount();
-    } else {
-      Integer instanceCount = scaling.getMinInstanceCount();
-      return instanceCount == null ? 0 : instanceCount;
-    }
+    return scaling.getManualInstanceCount();
   }
 
   /**
@@ -105,51 +100,6 @@ public class CloudRunClientWrapper {
   }
 
   /**
-   * Updates the number of min instances for a given worker pool.
-   *
-   * @param workerpoolName The name of the worker pool to update.
-   * @param instances The desired number of instances.
-   * @throws IOException If an error occurs during the API call.
-   */
-  public void updateWorkerPoolMinInstances(String workerpoolName, int instances)
-      throws IOException {
-    GoogleCloudRunV2WorkerPool workerpool = getWorkerPool(workerpoolName);
-
-    GoogleCloudRunV2WorkerPoolScaling oldScaling = workerpool.getScaling();
-    GoogleCloudRunV2WorkerPoolScaling newScaling = new GoogleCloudRunV2WorkerPoolScaling();
-    if (oldScaling != null && oldScaling.getMaxInstanceCount() != null) {
-      newScaling.setMaxInstanceCount(oldScaling.getMaxInstanceCount());
-    }
-
-    newScaling.setMinInstanceCount(instances);
-    newScaling.setScalingMode(AUTOMATIC_SCALING_MODE);
-
-    workerpool.setScaling(newScaling);
-
-    GoogleLongrunningOperation operation =
-        this.cloudRun
-            .projects()
-            .locations()
-            .workerPools()
-            .patch(
-                String.format(
-                    "projects/%s/locations/%s/workerPools/%s",
-                    this.projectId, this.region, workerpoolName),
-                workerpool)
-            .setUpdateMask(SCALING_UPDATE_MASK)
-            .execute();
-
-    if (operation.getError() != null) {
-      throw new IOException(
-          "Request failed to Cloud Run to update workerpool instances: " + operation.getError());
-    } else {
-      logger.atInfo().log(
-          "Sent update workerpool request to set instances to %d for workerpool %s",
-          instances, workerpoolName);
-    }
-  }
-
-  /**
    * Updates the number of manual instances for a given worker pool.
    *
    * @param workerpoolName The name of the worker pool to update.
@@ -160,7 +110,6 @@ public class CloudRunClientWrapper {
       throws IOException {
     GoogleCloudRunV2WorkerPoolScaling scaling = new GoogleCloudRunV2WorkerPoolScaling();
     scaling.setManualInstanceCount(instances);
-    scaling.setScalingMode(MANUAL_SCALING_MODE);
 
     GoogleCloudRunV2WorkerPool workerpool = getWorkerPool(workerpoolName);
     workerpool.setScaling(scaling);

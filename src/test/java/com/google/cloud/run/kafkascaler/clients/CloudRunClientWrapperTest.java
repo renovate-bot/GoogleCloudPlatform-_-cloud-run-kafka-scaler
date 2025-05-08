@@ -93,77 +93,17 @@ public final class CloudRunClientWrapperTest {
   }
 
   @Test
-  public void getWorkerPoolInstanceCount_withNullScalingMode_returnsMinInstances()
-      throws IOException {
-    int numInstances = 20;
-
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    workerPool.setScaling(
-        new GoogleCloudRunV2WorkerPoolScaling()
-            .setScalingMode(null)
-            .setMinInstanceCount(numInstances));
-
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-
-    assertThat(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
-        .isEqualTo(numInstances);
-  }
-
-  @Test
   public void getWorkerPoolInstanceCount_withManualScaling_returnsManualInstances()
       throws IOException {
     int numInstances = 20;
     GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
     workerPool.setScaling(
         new GoogleCloudRunV2WorkerPoolScaling()
-            .setScalingMode("MANUAL")
             .setManualInstanceCount(numInstances));
     when(getWorkerPool.execute()).thenReturn(workerPool);
 
     assertThat(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .isEqualTo(numInstances);
-  }
-
-  @Test
-  public void getWorkerPoolInstanceCount_withAutoScaling_returnsMinInstances() throws IOException {
-    int numInstances = 20;
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    workerPool.setScaling(
-        new GoogleCloudRunV2WorkerPoolScaling()
-            .setScalingMode("AUTOMATIC")
-            .setMinInstanceCount(numInstances));
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-
-    assertThat(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
-        .isEqualTo(numInstances);
-  }
-
-  @Test
-  public void getWorkerPoolInstanceCount_withAutoScalingAndNullMinInstances_returnsZero()
-      throws IOException {
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    workerPool.setScaling(
-        new GoogleCloudRunV2WorkerPoolScaling()
-            .setScalingMode("AUTOMATIC")
-            .setMinInstanceCount(null));
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-
-    assertThat(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME)).isEqualTo(0);
-  }
-
-  @Test
-  public void getWorkerPoolInstanceCount_withUnknownScalingMode_returnsMinInstanceCount()
-      throws IOException {
-    int numInstances = 20;
-
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    workerPool.setScaling(
-        new GoogleCloudRunV2WorkerPoolScaling()
-            .setScalingMode("RANDOM_SCALING_MODE")
-            .setMinInstanceCount(numInstances));
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-
-    assertThat(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME)).isEqualTo(numInstances);
   }
 
   @Test
@@ -182,7 +122,6 @@ public final class CloudRunClientWrapperTest {
 
     GoogleCloudRunV2WorkerPool actual = workerPoolCaptor.getValue();
     assertThat(actual.getScaling().getManualInstanceCount()).isEqualTo(10);
-    assertThat(actual.getScaling().getScalingMode()).isEqualTo("MANUAL");
     assertThat(actual.getLaunchStage()).isEqualTo("ALPHA");
     assertThat(updateMaskCaptor.getValue()).isEqualTo("scaling,launch_stage");
   }
@@ -203,46 +142,6 @@ public final class CloudRunClientWrapperTest {
     assertThrows(
         IOException.class,
         () -> cloudRunClientWrapper.updateWorkerPoolManualInstances(WORKERPOOL_NAME, 10));
-  }
-
-  @Test
-  public void updateWorkerPoolMinInstances_succeeds() throws IOException {
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    workerPool.setScaling(
-        new GoogleCloudRunV2WorkerPoolScaling().setMinInstanceCount(3).setMaxInstanceCount(111));
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-
-    when(workerPools.patch(eq(WORKERPOOL_RESOURCE_NAME), workerPoolCaptor.capture()))
-        .thenReturn(patchWorkerPool);
-    when(patchWorkerPool.setUpdateMask(updateMaskCaptor.capture())).thenReturn(patchWorkerPool);
-
-    GoogleLongrunningOperation operation = new GoogleLongrunningOperation();
-    when(patchWorkerPool.execute()).thenReturn(operation);
-
-    cloudRunClientWrapper.updateWorkerPoolMinInstances(WORKERPOOL_NAME, 10);
-
-    GoogleCloudRunV2WorkerPool actual = workerPoolCaptor.getValue();
-    assertThat(actual.getScaling().getMinInstanceCount()).isEqualTo(10);
-    assertThat(actual.getScaling().getMaxInstanceCount()).isEqualTo(111);
-    assertThat(actual.getScaling().getScalingMode()).isEqualTo("AUTOMATIC");
-    assertThat(updateMaskCaptor.getValue()).isEqualTo("scaling");
-  }
-
-  @Test
-  public void updateWorkerPoolMinInstances_operationError_throwsIOException() throws IOException {
-    GoogleCloudRunV2WorkerPool workerPool = new GoogleCloudRunV2WorkerPool();
-    when(getWorkerPool.execute()).thenReturn(workerPool);
-    when(workerPools.patch(any(), any())).thenReturn(patchWorkerPool);
-    when(patchWorkerPool.setUpdateMask(any())).thenReturn(patchWorkerPool);
-
-    GoogleLongrunningOperation operation = new GoogleLongrunningOperation();
-    when(patchWorkerPool.execute()).thenReturn(operation);
-
-    operation.setError(new GoogleRpcStatus().setMessage("error"));
-
-    assertThrows(
-        IOException.class,
-        () -> cloudRunClientWrapper.updateWorkerPoolMinInstances(WORKERPOOL_NAME, 10));
   }
 
   @Test
