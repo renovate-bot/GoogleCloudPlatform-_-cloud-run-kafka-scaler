@@ -430,3 +430,9 @@ behavior:
 *   `Instances`: Changes per-period are limited to the configured number of
     instances
 *   `periodSeconds`: Length of time over which the policy is enforced
+
+## Troubleshooting
+
+### OutOfMemoryError
+
+If you're seeing `java.lang.OutOfMemoryError` on startup, verify that your Kafka Admin Client Secret matches your broker's SSL configuration as the error may be a red herring. See [KAFKA-4493](https://issues.apache.org/jira/browse/KAFKA-4493) for details.
