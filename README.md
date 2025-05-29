@@ -11,8 +11,7 @@ to scale a Kafka consumer workload based on the Kafka consumer lag metric.
 run-oss-autoscaler-feedback@google.com**.
 
 *This autoscaler can be used with consumers running on Cloud Run Services
-or the new Worker Pools resource. [Sign-up here](https://forms.gle/n29krenCST6QP1gKA)
-to enroll in the Worker Pools Private Preview.*
+or the new Worker Pools resource (in Public Preview).
 
 ## Building the Kafka autoscaler
 
@@ -436,3 +435,11 @@ behavior:
 ### OutOfMemoryError
 
 If you're seeing `java.lang.OutOfMemoryError` on startup, verify that your Kafka Admin Client Secret matches your broker's SSL configuration as the error may be a red herring. See [KAFKA-4493](https://issues.apache.org/jira/browse/KAFKA-4493) for details.
+
+## FAQs
+
+**Q: How do I decide whether to use Services or Worker Pools for my Kafka Consumers?**
+
+A: Kafka Autoscaler can be used to scale your Kafka Consumers running as either Cloud Run Services or Worker Pools, but we strongly recommend using Worker Pools. They are purpose-built for non-HTTP, pull-based workloads and are 40% cheaper than comparable instance-billed services. Also, with no HTTP endpoint, Worker Pools reduce the attack surface and simplify application code.
+
+If you already have existing Kafka consumers running as Cloud Run services, you can still use the Kafka Autoscaler for queue-aware autoscaling with the same configuration.
