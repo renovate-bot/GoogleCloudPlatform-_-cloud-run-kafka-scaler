@@ -241,43 +241,43 @@ behavior:
 spec:
   scaleTargetRef:
     name: projects/PROJECT-ID/locations/us-central1/workerpools/kafka-consumer-worker
- metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 60
-        activationThreshold: 0
-        tolerance: 0.1
-        windowSeconds: 120
-  - type: External
-    external:
-      metric:
-        name: consumer_lag
-      target:
-        type: AverageValue
-        averageValue: 1000
-        activationThreshold: 0
-        tolerance: 0.1
-behavior:
-  scaleDown:
-    stabilizationWindowSeconds: 300
-    policies:
-    - type: Percent
-      value: 50
-      periodSeconds: 30
-    selectPolicy: Min
-  scaleUp:
-    stabilizationWindowSeconds: 0
-    policies:
-    - type: Percent
-      value: 100
-      periodSeconds: 15
-    - type: Instances
-      value: 4
-      periodSeconds: 15
-    selectPolicy: Max
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+          activationThreshold: 0
+          tolerance: 0.1
+          windowSeconds: 120
+    - type: External
+      external:
+        metric:
+          name: consumer_lag
+        target:
+          type: AverageValue
+          averageValue: 1000
+          activationThreshold: 0
+          tolerance: 0.1
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Instances
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
 ```
 
 ###### Create the secret
