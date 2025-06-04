@@ -28,6 +28,22 @@ import org.junit.runners.JUnit4;
 public final class MergerTest {
 
   @Test
+  public void merge_withNullPatch_returnsOriginal() {
+    Behavior original = DefaultBehavior.VALUE;
+    Behavior patch = null;
+
+    assertThat(Merger.merge(original, patch)).isEqualTo(original);
+  }
+
+  @Test
+  public void merge_withNullOriginal_returnsPatch() {
+    Behavior original = null;
+    Behavior patch = DefaultBehavior.VALUE;
+
+    assertThat(Merger.merge(original, patch)).isEqualTo(patch);
+  }
+
+  @Test
   public void merge_withEmptyPatch_returnsOriginal() {
     Behavior original = DefaultBehavior.VALUE;
     Behavior patch = Behavior.builder().build();

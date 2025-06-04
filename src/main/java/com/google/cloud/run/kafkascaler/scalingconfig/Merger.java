@@ -24,6 +24,14 @@ package com.google.cloud.run.kafkascaler.scalingconfig;
 public final class Merger {
 
   public static Behavior merge(Behavior original, Behavior patch) {
+    if (patch == null) {
+      return original;
+    }
+
+    if (original == null) {
+      return patch;
+    }
+
     Behavior.Builder newConfigBuilder = Behavior.builder();
 
     Scaling patchScaleUp = patch.scaleUp();
