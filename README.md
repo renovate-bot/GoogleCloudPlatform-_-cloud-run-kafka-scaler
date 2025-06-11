@@ -10,10 +10,28 @@ to scale a Kafka consumer workload based on the Kafka consumer lag metric.
 **Please send any questions or feedback related to this autoscaler to
 run-oss-autoscaler-feedback@google.com**.
 
-*This autoscaler can be used with consumers running on Cloud Run Services
-or the new Worker Pools resource (in Public Preview).
+This autoscaler can be used with consumers running on Cloud Run services
+or the new worker pools resource (in Public Preview).
 
-## Building the Kafka autoscaler
+## Architecture
+
+The following diagram provides a visual overview of the system's architecture
+
+![Architecture diagram](./architecture.png)
+
+Here’s how it works:
+
+1. **Scheduled Trigger:** A Cloud Scheduler job is configured to periodically trigger the autoscaling logic at a defined interval (e.g., every minute). For scaling checks more frequent than once per minute, the scheduler can be configured to push a task to a Cloud Tasks queue.
+2. **Read Kafka Lag:** The trigger invokes the Kafka Autoscaler Cloud Run service. The autoscaler connects directly to your Kafka cluster to read the consumer offset lag for your specified consumer group. It can also optionally fetch CPU utilization metrics for the consumer from Cloud Monitoring.
+
+3. **Set instances:** Based on the collected metrics and the user-defined scaling policies in the scaler_config.yaml secret, the autoscaler calculates the optimal number of consumer instances required to handle the current load. It then uses the Cloud Run Admin API's [manual scaling](https://cloud.google.com/run/docs/configuring/services/manual-scaling) feature to adjust the instance count of the target Kafka consumer workload (which can be a Cloud Run service or a worker pool).
+
+
+
+
+
+
+## Building the Kafka Autoscaler
 
 A container image of Kafka Autoscaler can be built from this source code using Cloud Build.
 
@@ -49,7 +67,7 @@ Before deploying the autoscaler using either the manual or Terraform method, ens
 
 
 #### 2. Deployed Cloud Run Consumer
-* A Kafka consumer workload must be deployed to Cloud Run (as a Service or Worker Pool) and configured to connect to your Kafka cluster and topic/consumer group.
+* A Kafka consumer workload must be deployed to Cloud Run (as a service or worker pool) and configured to connect to your Kafka cluster and topic/consumer group.
 * Identify the **Service Account email** used by this consumer workload (`CONSUMER_SA_EMAIL`). This service account needs permissions to interact with Kafka (e.g., read offsets).
 *   **(Best Practice)** Connect your Kafka consumers to your VPC network using [Direct
     VPC](https://cloud.google.com/run/docs/configuring/vpc-direct-vpc). This
@@ -392,6 +410,21 @@ In the logs of your Kafka autoscaler service, you should see messages like
 
 If the OUTPUT_SCALER_METRICS flag is enabled, you can also find scaler Cloud Monitoring metrics under `custom.googleapis.com/cloud-run-kafkascaler/`.
 
+## Cost Considerations 
+
+This solution uses the following billable Google Cloud components:
+
+* Cloud Run (Kafka consumer workload and the autoscaler service)
+* Cloud Scheduler
+* Cloud Tasks
+* Secret Manager
+
+The deployed Cloud Run resources are billed for the compute time used at the standard [Cloud Run prices](https://cloud.google.com/run/pricing).
+
+The autoscaler runs as a request-billed service with `max-instances=1`, so its costs are minimal (typically less than $1 per month). 
+
+To stop all billing, you must delete the created resources. The `cleanup.sh` script in the root of this repository can be used to delete the resources created by the setup script. If you used Terraform to deploy the resources, run `terraform destroy` to remove all associated infrastructure.
+
 ## Reference: Scaling Configuration
 
 Note: See [Kubernetes Horizontal Pod
@@ -437,8 +470,8 @@ If you're seeing `java.lang.OutOfMemoryError` on startup, verify that your Kafka
 
 ## FAQs
 
-**Q: How do I decide whether to use Services or Worker Pools for my Kafka Consumers?**
+**Q: How do I decide whether to use services or worker pools for my Kafka Consumers?**
 
-A: Kafka Autoscaler can be used to scale your Kafka Consumers running as either Cloud Run Services or Worker Pools, but we strongly recommend using Worker Pools. They are purpose-built for non-HTTP, pull-based workloads and are 40% cheaper than comparable instance-billed services. Also, with no HTTP endpoint, Worker Pools reduce the attack surface and simplify application code.
+A: Kafka Autoscaler can be used to scale your Kafka Consumers running as either Cloud Run services or worker pools, but we strongly recommend using worker pools. They are purpose-built for non-HTTP, pull-based workloads and are 40% cheaper than comparable instance-billed services. Also, with no HTTP endpoint, worker pools reduce the attack surface and simplify application code.
 
 If you already have existing Kafka consumers running as Cloud Run services, you can still use the Kafka Autoscaler for queue-aware autoscaling with the same configuration.
