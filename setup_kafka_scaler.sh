@@ -17,121 +17,151 @@
 
 printf "Verify environment variables to be used:\n"
 printf "\nDeployed Kafka consumer details:\n"
-if [[ -v CONSUMER_SERVICE_NAME ]]; then
-  echo "CONSUMER_SERVICE_NAME: " $CONSUMER_SERVICE_NAME
+
+declare -a missing_vars
+
+if [[ -n "${PROJECT_ID}" ]]; then
+  echo "PROJECT_ID: $PROJECT_ID"
 else
-  echo "***** CONSUMER_SERVICE_NAME is not set. ***** "
+    missing_vars+=("PROJECT_ID")
 fi
-if [[ -v CONSUMER_SA_EMAIL ]]; then
-  echo "CONSUMER_SA_EMAIL: " $CONSUMER_SA_EMAIL
+
+if [[ -n "${REGION}" ]]; then
+  echo "REGION: $REGION"
 else
-  echo "***** CONSUMER_SA_EMAIL is not set. ***** "
+  missing_vars+=("REGION")
 fi
-if [[ -v PROJECT_ID ]]; then
-  echo "PROJECT_ID: " $PROJECT_ID
+
+if [[ -n "${CONSUMER_SERVICE_NAME}" ]]; then
+  echo "CONSUMER_SERVICE_NAME: $CONSUMER_SERVICE_NAME"
 else
-  echo "***** PROJECT_ID is not set. ***** "
+  missing_vars+=("CONSUMER_SERVICE_NAME")
 fi
-if [[ -v REGION ]]; then
-  echo "REGION: " $REGION
+
+if [[ -n "${CONSUMER_SA_EMAIL}" ]]; then
+  echo "CONSUMER_SA_EMAIL: $CONSUMER_SA_EMAIL"
 else
-  echo "***** REGION is not set. ***** "
+  missing_vars+=("CONSUMER_SA_EMAIL")
 fi
-if [[ -v TOPIC_ID ]]; then
-  echo "TOPIC_ID: " $TOPIC_ID
+
+if [[ -n "${TOPIC_ID}" ]]; then
+  echo "TOPIC_ID: $TOPIC_ID"
 else
-  echo "***** TOPIC_ID is not set. ***** "
+  missing_vars+=("TOPIC_ID")
 fi
-if [[ -v CONSUMER_GROUP_ID ]]; then
-  echo "CONSUMER_GROUP_ID: " $CONSUMER_GROUP_ID
+
+if [[ -n "${CONSUMER_GROUP_ID}" ]]; then
+  echo "CONSUMER_GROUP_ID: $CONSUMER_GROUP_ID"
 else
-  echo "***** CONSUMER_GROUP_ID is not set. ***** "
+  missing_vars+=("CONSUMER_GROUP_ID")
+fi
+
+if [[ -n "${NETWORK}" ]]; then
+  echo "NETWORK: $NETWORK"
+fi
+
+if [[ -n "${SUBNET}" ]]; then
+  echo "SUBNET: $SUBNET"
 fi
 
 printf "\nKafka auth secret created in previous step:\n"
-if [[ -v ADMIN_CLIENT_SECRET ]]; then
+if [[ -n "${ADMIN_CLIENT_SECRET}" ]]; then
   echo "ADMIN_CLIENT_SECRET is set."
 else
-  echo "***** ADMIN_CLIENT_SECRET is not set. ***** "
+  missing_vars+=("ADMIN_CLIENT_SECRET")
 fi
-if [[ -v SCALER_CONFIG_SECRET ]]; then
+
+if [[ -n "${SCALER_CONFIG_SECRET}" ]]; then
   echo "SCALER_CONFIG_SECRET is set."
 else
-  echo "***** SCALER_CONFIG_SECRET is not set. ***** "
+  missing_vars+=("SCALER_CONFIG_SECRET")
 fi
 
 printf "\nNew components that will be created: \n"
-printf "Cloud Tasks:\n"
-if [[ -v CLOUD_TASKS_QUEUE_NAME ]]; then
-  echo "CLOUD_TASKS_QUEUE_NAME: " $CLOUD_TASKS_QUEUE_NAME
+if [[ -n "${SCALER_SERVICE_NAME}" ]]; then
+  echo "SCALER_SERVICE_NAME: $SCALER_SERVICE_NAME"
+  SCALER_SA_NAME=$SCALER_SERVICE_NAME-sa
+  CLOUD_SCHEDULER_JOB=$SCALER_SERVICE_NAME-cron
+  CLOUD_SCHEDULER_SA=$CLOUD_SCHEDULER_JOB-sa
 else
-  echo "***** CLOUD_TASKS_QUEUE_NAME is not set. ***** "
-fi
-if [[ -v TASKS_SERVICE_ACCOUNT ]]; then
-  echo "TASKS_SERVICE_ACCOUNT: " $TASKS_SERVICE_ACCOUNT
-else
-  echo "***** TASKS_SERVICE_ACCOUNT is not set. ***** "
+  missing_vars+=("SCALER_SERVICE_NAME")
 fi
 
-FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME=projects/$PROJECT_ID/locations/$REGION/queues/$CLOUD_TASKS_QUEUE_NAME
-
-printf "\nKafka autoscaler:\n"
-if [[ -v SCALER_SERVICE_NAME ]]; then
-  echo "SCALER_SERVICE_NAME: " $SCALER_SERVICE_NAME
+if [[ -n "${SCALER_IMAGE_PATH}" ]]; then
+  echo "SCALER_IMAGE_PATH: $SCALER_IMAGE_PATH"
 else
-  echo "***** SCALER_SERVICE_NAME is not set. ***** "
-fi
-if [[ -v SCALER_IMAGE_PATH ]]; then
-  echo "SCALER_IMAGE_PATH: " $SCALER_IMAGE_PATH
-else
-  echo "***** SCALER_IMAGE_PATH is not set. ***** "
-fi
-if [[ -v NETWORK ]]; then
-  echo "NETWORK: " $NETWORK
-else
-  echo "***** NETWORK is not set. ***** "
-fi
-if [[ -v SUBNET ]]; then
-  echo "SUBNET: " $SUBNET
-else
-  echo "***** SUBNET is not set. ***** "
+  missing_vars+=("SCALER_IMAGE_PATH")
 fi
 
-SCALER_SA_NAME=$SCALER_SERVICE_NAME-sa
+if [[ -n "${CYCLE_SECONDS}" ]]; then
+  printf "\nAutoscaling frequency:\n"
+  echo "CYCLE_SECONDS: $CYCLE_SECONDS"
 
-printf "\nAutoscaling frequency:\n"
-if [[ -v CYCLE_SECONDS ]]; then
-  echo "CYCLE_SECONDS: " $CYCLE_SECONDS
+  # If the autoscaling frequency is less than 60 seconds, we need to create a
+  # Cloud Tasks queue and a service account to be used by the Cloud Tasks.
+  if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
+    printf "\nCloud Tasks:\n"
+    if [[ -n "${CLOUD_TASKS_QUEUE_NAME}" ]]; then
+      echo "CLOUD_TASKS_QUEUE_NAME: $CLOUD_TASKS_QUEUE_NAME"
+    else
+      missing_vars+=("CLOUD_TASKS_QUEUE_NAME")
+    fi
+
+    if [[ -n "${TASKS_SERVICE_ACCOUNT}" ]]; then
+      echo "TASKS_SERVICE_ACCOUNT: $TASKS_SERVICE_ACCOUNT"
+    else
+      missing_vars+=("TASKS_SERVICE_ACCOUNT")
+    fi
+  fi
 else
-  echo "***** CYCLE_SECONDS is not set. ***** "
+  missing_vars+=("CYCLE_SECONDS")
 fi
 
-# Cloud Scheduler Job
-CLOUD_SCHEDULER_JOB=$SCALER_SERVICE_NAME-cron
-CLOUD_SCHEDULER_SA=$CLOUD_SCHEDULER_JOB-sa
+if [[ "${#missing_vars[@]}" -gt 0 ]]; then
+  printf "\n***** The following variables are required but not set: *****\n"
+  for var in "${missing_vars[@]}"; do
+    echo "  - $var"
+  done
+  printf "\n***** Please set the required variables before running the script. *****\n"
+  exit 1
+fi
 
 read -p "Press any key to continue..."
 ###################################
+
+###
+# Service Accounts setup
+###
+
+# Create Kafka autoscaler service account
+gcloud iam service-accounts create $SCALER_SA_NAME
+
+#Create a service account for Cloud Scheduler:
+gcloud iam service-accounts create $CLOUD_SCHEDULER_SA \
+    --description="Service Acount for Cloud Scheduler to invoke Cloud Run" \
+    --project=$PROJECT_ID
+
+# Create Tasks service account
+if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
+  gcloud iam service-accounts create $TASKS_SERVICE_ACCOUNT
+fi
+
+# Delay to allow time for propagation
+sleep 10
 
 ####
 # Cloud Tasks setup
 ####
 
-# Create Cloud Tasks Queue
-gcloud tasks queues create $CLOUD_TASKS_QUEUE_NAME --location=$REGION
-
-# Create Tasks service account
-gcloud iam service-accounts create $TASKS_SERVICE_ACCOUNT
+if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
+  # Create Cloud Tasks Queue
+  gcloud tasks queues create $CLOUD_TASKS_QUEUE_NAME --location=$REGION
+  FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME=projects/$PROJECT_ID/locations/$REGION/queues/$CLOUD_TASKS_QUEUE_NAME
+fi
 
 ####
 # Kafka autoscaler setup
 ####
-
-# Create Kafka autoscaler service account
-gcloud iam service-accounts create $SCALER_SA_NAME
-
-# Delay to allow time for propagation
-sleep 5
 
 # Grant necessary permissions to Kafka autoscaler service account
 gcloud iam service-accounts add-iam-policy-binding $CONSUMER_SA_EMAIL \
@@ -149,11 +179,13 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --role="roles/run.admin" \
     --condition=None --quiet
 
-gcloud tasks queues add-iam-policy-binding $CLOUD_TASKS_QUEUE_NAME \
-    --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/cloudtasks.enqueuer" \
-    --location=$REGION \
-    --quiet
+if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
+  gcloud tasks queues add-iam-policy-binding $CLOUD_TASKS_QUEUE_NAME \
+      --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+      --role="roles/cloudtasks.enqueuer" \
+      --location=$REGION \
+      --quiet
+fi
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
@@ -166,13 +198,16 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --condition=None --quiet
 
 # Setup Kafka scaler env vars file
-echo -n 'KAFKA_TOPIC_ID: $TOPIC_ID
-CONSUMER_GROUP_ID: $CONSUMER_GROUP_ID
-CYCLE_SECONDS: "$CYCLE_SECONDS"
-FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME: $FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME
-INVOKER_SERVICE_ACCOUNT_EMAIL: $TASKS_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com
-OUTPUT_SCALER_METRICS: $OUTPUT_SCALER_METRICS' > scaler_env_vars.yaml
+echo "KAFKA_TOPIC_ID: ${TOPIC_ID}
+CONSUMER_GROUP_ID: ${CONSUMER_GROUP_ID}
+CYCLE_SECONDS: \"${CYCLE_SECONDS}\"
+OUTPUT_SCALER_METRICS: ${OUTPUT_SCALER_METRICS}" > scaler_env_vars.yaml
 
+# Only add Cloud Tasks related env vars if they are needed (cycle < 60s)
+if [[ "${CYCLE_SECONDS}" -lt 60 ]]; then
+  echo "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME: projects/${PROJECT_ID}/locations/${REGION}/queues/${CLOUD_TASKS_QUEUE_NAME}
+INVOKER_SERVICE_ACCOUNT_EMAIL: ${TASKS_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" >> scaler_env_vars.yaml
+fi
 ####
 # Deploy the Kafka autoscaler
 ####
@@ -201,15 +236,7 @@ gcloud run services add-iam-policy-binding $SCALER_SERVICE_NAME \
 # Create Cloud Scheduler Job to trigger Kafka autoscaler checks
 ####
 
-#Create a service account for Cloud Scheduler:
-gcloud iam service-accounts create $CLOUD_SCHEDULER_SA \
-    --description="Service Acount for Cloud Scheduler to invoke Cloud Run" \
-    --project=$PROJECT_ID
-
-# Delay for propagation
-sleep 5
-
-#Add necessary permissions (may have to wait a few moments SA to exist):
+#Add necessary permissions
 gcloud run services add-iam-policy-binding $SCALER_SERVICE_NAME \
     --member="serviceAccount:$CLOUD_SCHEDULER_SA@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/run.invoker"

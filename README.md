@@ -320,14 +320,13 @@ export NETWORK=<vpc-network>
 export SUBNET=<vpc-subnet>
 
 # Details for new items to be created during this setup
-export CLOUD_TASKS_QUEUE_NAME=<cloud-tasks-queue-for-scaling-checks>
-export TASKS_SERVICE_ACCOUNT=<tasks-service-account-name>
-
 export SCALER_SERVICE_NAME=<kafka-autoscaler-service-name>
 export SCALER_IMAGE_PATH=<kafka-autoscaler-image-URI>
 export SCALER_CONFIG_SECRET=<kafka-autoscaler-config-secret-name>
 
 export CYCLE_SECONDS=<scaler-check-frequency e.g. 15> # Note: this should be at least 5 seconds
+export CLOUD_TASKS_QUEUE_NAME=<cloud-tasks-queue-for-scaling-checks>
+export TASKS_SERVICE_ACCOUNT=<tasks-service-account-name>
 
 export OUTPUT_SCALER_METRICS=false # If you want scaling metrics to outputted to Cloud Monitoring set this to true and ensure your scaler service account has permission to write metrics (e.g. via roles/monitoring.metricWriter).
 ```
