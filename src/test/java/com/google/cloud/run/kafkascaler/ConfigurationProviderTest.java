@@ -92,13 +92,14 @@ public final class ConfigurationProviderTest {
   }
 
   @Test
-  public void staticConfig_missingKafkaTopicId_throwsIllegalArgumentException() {
+  public void staticConfig_missingKafkaTopicId_returnsEmptyOptionalTopicName() throws IOException {
     ConfigurationProvider configuration =
         new ConfigurationProvider(
             new FakeEnvProvider(ImmutableMap.of("CONSUMER_GROUP_ID", CONSUMER_GROUP_ID)),
             SCALING_CONFIG_FILE);
 
-    assertThrows(IllegalArgumentException.class, configuration::staticConfig);
+    ConfigurationProvider.StaticConfig staticConfig = configuration.staticConfig();
+    assertThat(staticConfig.topicName()).isEmpty();
   }
 
   @Test

@@ -127,13 +127,13 @@ public final class ScalerTest {
 
   private static final ConfigurationProvider.StaticConfig MANUAL_SCALING_STATIC_CONFIG =
       new ConfigurationProvider.StaticConfig(
-          TOPIC_NAME,
+          Optional.of(TOPIC_NAME),
           CONSUMER_GROUP_ID,
           /* useMinInstances= */ false,
           /* outputScalerMetrics= */ false);
   private static final ConfigurationProvider.StaticConfig AUTO_SCALING_STATIC_CONFIG =
       new ConfigurationProvider.StaticConfig(
-          TOPIC_NAME,
+          Optional.of(TOPIC_NAME),
           CONSUMER_GROUP_ID,
           /* useMinInstances= */ true,
           /* outputScalerMetrics= */ false);
@@ -204,7 +204,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
 
     scaler.scale();
@@ -212,38 +212,6 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-
-    verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
-  }
-
-  @Test
-  public void scale_topicDoesNotExist_doesNotCallAnyDependencies()
-      throws IOException, InterruptedException, ExecutionException {
-    ConfigurationProvider.StaticConfig nonExistentTopicConfig =
-        new ConfigurationProvider.StaticConfig(
-            "non-existent-topic",
-            CONSUMER_GROUP_ID,
-            /* useMinInstances= */ false,
-            /* outputScalerMetrics= */ true);
-    Scaler scaler =
-        new Scaler(
-            kafka,
-            scalingStabilizer,
-            cloudRunClientWrapper,
-            metricsService,
-            SERVICE_WORKLOAD_INFO,
-            nonExistentTopicConfig,
-            configurationProvider);
-
-    assertThrows(IllegalArgumentException.class, scaler::scale);
-
-    verify(cloudRunClientWrapper, never()).getServiceInstanceCount(any());
-    verify(cloudRunClientWrapper, never()).getWorkerPoolInstanceCount(any());
-    verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
-    verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
-
-    verify(kafka, never()).getLagPerPartition(any(), any());
 
     verify(scalingStabilizer, never()).markScaleEvent(any(), any(), anyInt(), anyInt());
   }
@@ -293,7 +261,7 @@ public final class ScalerTest {
 
     when(kafka.getLagPerPartition(any(), any())).thenReturn(Optional.empty());
 
-    assertThrows(AssertionError.class, scaler::scale);
+    scaler.scale();
     verify(cloudRunClientWrapper, never()).updateServiceManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateWorkerPoolManualInstances(any(), anyInt());
     verify(cloudRunClientWrapper, never()).updateServiceMinInstances(any(), anyInt());
@@ -394,7 +362,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -427,7 +395,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -446,7 +414,7 @@ public final class ScalerTest {
 
     ConfigurationProvider.StaticConfig outputMetricsStaticConfig =
         new ConfigurationProvider.StaticConfig(
-            TOPIC_NAME,
+            Optional.of(TOPIC_NAME),
             CONSUMER_GROUP_ID,
             /* useMinInstances= */ false,
             /* outputScalerMetrics= */ true);
@@ -466,7 +434,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -483,7 +451,7 @@ public final class ScalerTest {
 
     ConfigurationProvider.StaticConfig outputMetricsStaticConfig =
         new ConfigurationProvider.StaticConfig(
-            TOPIC_NAME,
+            Optional.of(TOPIC_NAME),
             CONSUMER_GROUP_ID,
             /* useMinInstances= */ false,
             /* outputScalerMetrics= */ false);
@@ -503,7 +471,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -533,7 +501,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -565,7 +533,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 1000L)));
     when(scalingStabilizer.getBoundedRecommendation(
             eq(BEHAVIOR), any(), eq(currentInstanceCount), anyInt()))
@@ -600,7 +568,8 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     // Recommendation should be 3000/1000 = 3 but we verify that this is limited to the number of
@@ -657,7 +626,8 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 999;
     when(scalingStabilizer.getBoundedRecommendation(any(), any(), anyInt(), eq(0)))
@@ -696,7 +666,8 @@ public final class ScalerTest {
 
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 0L));
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     when(scalingStabilizer.getBoundedRecommendation(eq(BEHAVIOR), any(), anyInt(), anyInt()))
@@ -735,7 +706,8 @@ public final class ScalerTest {
 
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 0L));
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     when(scalingStabilizer.getBoundedRecommendation(any(), any(), anyInt(), anyInt()))
@@ -766,7 +738,8 @@ public final class ScalerTest {
 
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 0L));
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     when(scalingStabilizer.getBoundedRecommendation(eq(BEHAVIOR), any(), anyInt(), anyInt()))
@@ -798,7 +771,8 @@ public final class ScalerTest {
 
     Optional<Map<TopicPartition, Long>> lagPerPartition =
         makeLagPerPartitionMap(ImmutableMap.of(1, 0L));
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     when(scalingStabilizer.getBoundedRecommendation(eq(BEHAVIOR), any(), anyInt(), anyInt()))
@@ -861,7 +835,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getServiceInstanceCount(SERVICE_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 0L, 2, 0L, 3, 0L)));
 
     int newInstanceCount = 10;
@@ -920,7 +894,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 0L, 2, 0L, 3, 0L)));
 
     int newInstanceCount = 10;
@@ -982,7 +956,7 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 0L, 2, 0L, 3, 0L)));
 
     int newInstanceCount = 10;
@@ -1020,7 +994,8 @@ public final class ScalerTest {
     when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
 
     int newInstanceCount = 1;
     when(scalingStabilizer.getBoundedRecommendation(
@@ -1082,7 +1057,7 @@ public final class ScalerTest {
     when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
         .thenReturn(currentInstanceCount);
     // Return 0 lag. This makes lag scaling inactive.
-    when(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID))
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
         .thenReturn(makeLagPerPartitionMap(ImmutableMap.of(1, 0L)));
 
     int newInstanceCount = 999;
@@ -1094,5 +1069,98 @@ public final class ScalerTest {
     verify(cloudRunClientWrapper)
         .updateWorkerPoolManualInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
     verify(scalingStabilizer).markScaleEvent(any(), any(), anyInt(), eq(newInstanceCount));
+  }
+
+  @Test
+  public void scale_noTopicName_scalesOnCombinedLagFromAllTopics()
+      throws IOException, InterruptedException, ExecutionException {
+    ConfigurationProvider.StaticConfig noTopicNameConfig =
+        new ConfigurationProvider.StaticConfig(
+            Optional.empty(),
+            CONSUMER_GROUP_ID,
+            /* useMinInstances= */ false,
+            /* outputScalerMetrics= */ false);
+
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            WORKERPOOL_WORKLOAD_INFO,
+            noTopicNameConfig,
+            configurationProvider);
+
+    int currentInstanceCount = 25;
+
+    // 3000 lag across 2 partitions and 2 topics
+    Optional<Map<TopicPartition, Long>> lagPerPartition =
+        Optional.of(
+            ImmutableMap.of(
+                new TopicPartition("topic-1", 0), 1000L, new TopicPartition("topic-2", 0), 2000L));
+
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
+    when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
+        .thenReturn(currentInstanceCount);
+    when(kafka.getLagPerPartition(Optional.empty(), CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+
+    int newInstanceCount = 1;
+    // Recommendation should be 3000/1000 = 3 but we verify that this is limited to the max number
+    // of partitions for a single topic (1) before being passed to the stabilizer.
+    when(scalingStabilizer.getBoundedRecommendation(
+            eq(BEHAVIOR), any(), eq(currentInstanceCount), eq(1)))
+        .thenReturn(newInstanceCount);
+
+    scaler.scale();
+
+    verify(cloudRunClientWrapper)
+        .updateWorkerPoolManualInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
+    verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
+  }
+
+  @Test
+  public void scale_recommendationGreaterThanMaxPartitions_updatesWorkerPoolToMaxPartitionCount()
+      throws IOException, InterruptedException, ExecutionException {
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            WORKERPOOL_WORKLOAD_INFO,
+            MANUAL_SCALING_STATIC_CONFIG,
+            configurationProvider);
+
+    int currentInstanceCount = 25;
+
+    // 3000 lag across 3 partitions and 2 topics
+    Optional<Map<TopicPartition, Long>> lagPerPartition =
+        Optional.of(
+            ImmutableMap.of(
+                new TopicPartition(TOPIC_NAME, 0),
+                1000L,
+                new TopicPartition(TOPIC_NAME, 1),
+                1000L,
+                new TopicPartition("another-topic", 0),
+                1000L));
+
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
+    when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
+        .thenReturn(currentInstanceCount);
+    when(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID))
+        .thenReturn(lagPerPartition);
+
+    int newInstanceCount = 1;
+    // Recommendation should be 3000/1000 = 3 but we verify that this is limited to the max number
+    // of partitions for a single topic (2) before being passed to the stabilizer.
+    when(scalingStabilizer.getBoundedRecommendation(
+            eq(BEHAVIOR), any(), eq(currentInstanceCount), eq(2)))
+        .thenReturn(newInstanceCount);
+
+    scaler.scale();
+
+    verify(cloudRunClientWrapper)
+        .updateWorkerPoolManualInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
+    verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
   }
 }

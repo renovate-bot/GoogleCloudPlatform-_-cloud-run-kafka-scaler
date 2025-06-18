@@ -30,6 +30,7 @@ import com.google.common.flogger.FluentLogger;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -104,11 +105,6 @@ public class Scaler {
   public void scale() throws IOException, InterruptedException, ExecutionException {
     Instant now = Instant.now();
 
-    if (!kafka.doesTopicExist(staticConfig.topicName())) {
-      throw new IllegalArgumentException(
-          String.format("The specified topic \"%s\" does not exist.", staticConfig.topicName()));
-    }
-
     int lastRequestedInstanceCount =
         InstanceCountProvider.getInstanceCount(cloudRunClientWrapper, workloadInfo);
     int currentInstanceCount = kafka.getCurrentConsumerCount(staticConfig.consumerGroupId());
@@ -122,13 +118,23 @@ public class Scaler {
 
     logger.atInfo().log("[SCALING] Current instances: %d", currentInstanceCount);
 
-    // Current lag should never be empty here because we already checked that the topic exists.
-    Map<TopicPartition, Long> lagPerPartition =
-        kafka
-            .getLagPerPartition(staticConfig.topicName(), staticConfig.consumerGroupId())
-            .orElseThrow(() -> new AssertionError("Current lag is empty."));
+    if (staticConfig.topicName().isPresent()
+        && !kafka.doesTopicExist(staticConfig.topicName().get())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "The specified topic \"%s\" does not exist.", staticConfig.topicName().get()));
+    }
 
-    long currentLag = lagPerPartition.values().stream().mapToLong(Long::longValue).sum();
+    Optional<Map<TopicPartition, Long>> lagPerPartition =
+        kafka.getLagPerPartition(staticConfig.topicName(), staticConfig.consumerGroupId());
+    if (lagPerPartition.isEmpty()) {
+      logger.atWarning().log(
+          "[SCALING] No lag data available for consumer group \"%s\"; skipping scaling.",
+          staticConfig.consumerGroupId());
+      return;
+    }
+
+    long currentLag = lagPerPartition.get().values().stream().mapToLong(Long::longValue).sum();
 
     ScalingConfig scalingConfig = configProvider.scalingConfig();
     Behavior behavior = scalingConfig.spec().behavior();
@@ -179,12 +185,13 @@ public class Scaler {
                 ? cpuBasedRecommendation.recommendedInstanceCount()
                 : 0);
 
-    if (recommendedInstanceCount > lagPerPartition.size()) {
+    int maxPartitionCount = getMaxPartitionCount(lagPerPartition.get());
+    if (recommendedInstanceCount > maxPartitionCount) {
       logger.atWarning().log(
-          "The recommended number of instances (%d) is greater than the number of partitions"
-              + " (%d). The recommendation will be limited to the number of partitions.",
-          recommendedInstanceCount, lagPerPartition.size());
-      recommendedInstanceCount = lagPerPartition.size();
+          "Recommended instances (%d) exceeds max partition count for any single subscribed topic"
+              + " (%d). Limiting recommendation to partition count.",
+          recommendedInstanceCount, maxPartitionCount);
+      recommendedInstanceCount = maxPartitionCount;
     }
 
     int newInstanceCount =
@@ -266,5 +273,14 @@ public class Scaler {
       // An exception here is not critical to scaling. Log the exception and continue.
       logger.atWarning().withCause(ex).log("Failed to write metrics to Cloud Monitoring.");
     }
+  }
+
+  private int getMaxPartitionCount(Map<TopicPartition, Long> lagPerPartition) {
+    Map<String, Integer> partitionCountPerTopic = new HashMap<>();
+    for (TopicPartition partition : lagPerPartition.keySet()) {
+      partitionCountPerTopic.put(
+          partition.topic(), partitionCountPerTopic.getOrDefault(partition.topic(), 0) + 1);
+    }
+    return partitionCountPerTopic.values().stream().max(Integer::compare).orElse(0);
   }
 }

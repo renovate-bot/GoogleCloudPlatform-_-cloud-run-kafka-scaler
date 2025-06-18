@@ -19,6 +19,7 @@ package com.google.cloud.run.kafkascaler;
 import static java.lang.Math.max;
 
 import com.google.cloud.run.kafkascaler.clients.KafkaAdminClientWrapper;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,16 +75,35 @@ public class Kafka {
   }
 
   /**
-   * Gets the lag for each partition of a given topic and consumer group.
+   * Gets the lag per TopicPartition for a given consumer group and topic.
    *
    * @param topicName The name of the topic.
    * @param consumerGroupId The ID of the consumer group.
-   * @return An Optional containing a map of partition to lag, or an empty Optional if the topic
-   *     does not exist.
+   * @return An Optional containing a map of TopicPartitions to lag, or an empty Optional if the
+   *     topic does not exist.
    */
   public Optional<Map<TopicPartition, Long>> getLagPerPartition(
+      Optional<String> topicName, String consumerGroupId)
+      throws InterruptedException, ExecutionException {
+    if (topicName.isPresent()) {
+      return getLagPerPartitionForTopic(topicName.get(), consumerGroupId);
+    } else {
+      return getLagPerPartitionForConsumerGroup(consumerGroupId);
+    }
+  }
+
+  /**
+   * Gets the lag per TopicPartition for a given consumer group and topic.
+   *
+   * @param topicName The name of the topic.
+   * @param consumerGroupId The ID of the consumer group.
+   * @return An Optional containing a map of TopicPartitions to lag, or an empty Optional if the
+   *     topic does not exist.
+   */
+  private Optional<Map<TopicPartition, Long>> getLagPerPartitionForTopic(
       String topicName, String consumerGroupId) throws InterruptedException, ExecutionException {
-    Map<String, TopicDescription> topicDescription = adminClient.describeTopics(topicName);
+    Map<String, TopicDescription> topicDescription =
+        adminClient.describeTopics(Collections.singleton(topicName));
 
     if (!topicDescription.containsKey(topicName)) {
       return Optional.empty();
@@ -102,22 +122,55 @@ public class Kafka {
     Map<TopicPartition, OffsetAndMetadata> consumerGroupOffsets =
         adminClient.listConsumerGroupOffsets(consumerGroupId);
 
-    Map<TopicPartition, Long> lagPerPartition = new HashMap<>();
+    return Optional.of(calculateLag(topicOffsets, consumerGroupOffsets));
+  }
+
+  /**
+   * Gets the lag per TopicPartition for a given consumer group.
+   *
+   * @param consumerGroupId The ID of the consumer group.
+   * @return An Optional containing a map of TopicPartitions to lag, or an empty Optional if the
+   *     consumer group does not have any offsets.
+   */
+  private Optional<Map<TopicPartition, Long>> getLagPerPartitionForConsumerGroup(
+      String consumerGroupId) throws InterruptedException, ExecutionException {
+    Map<TopicPartition, OffsetAndMetadata> consumerGroupOffsets =
+        adminClient.listConsumerGroupOffsets(consumerGroupId);
+
+    if (consumerGroupOffsets.isEmpty()) {
+      return Optional.empty();
+    }
+
+    Map<TopicPartition, OffsetSpec> topicPartitionOffsets = new HashMap<>();
+    for (TopicPartition topicPartition : consumerGroupOffsets.keySet()) {
+      topicPartitionOffsets.put(topicPartition, OffsetSpec.latest());
+    }
+
+    Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> topicOffsets =
+        adminClient.listOffsets(topicPartitionOffsets);
+
+    return Optional.of(calculateLag(topicOffsets, consumerGroupOffsets));
+  }
+
+  private Map<TopicPartition, Long> calculateLag(
+      Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> producerOffsets,
+      Map<TopicPartition, OffsetAndMetadata> consumerOffsets) {
+    Map<TopicPartition, Long> lagPerTopicPartition = new HashMap<>();
     // Iterate over the topic's offsets rather than the consumer group's to ensure we get info even
     // if the consumer groups don't exist or don't have anything committed yet.
     for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> e :
-        topicOffsets.entrySet()) {
+        producerOffsets.entrySet()) {
       long topicOffset = e.getValue().offset();
 
-      if (!consumerGroupOffsets.containsKey(e.getKey())) {
-        lagPerPartition.put(e.getKey(), topicOffset);
+      if (!consumerOffsets.containsKey(e.getKey())) {
+        lagPerTopicPartition.put(e.getKey(), topicOffset);
       } else {
-        OffsetAndMetadata consumer = consumerGroupOffsets.get(e.getKey());
+        OffsetAndMetadata consumer = consumerOffsets.get(e.getKey());
         long consumerOffset = consumer.offset();
-        lagPerPartition.put(e.getKey(), max(topicOffset - consumerOffset, 0));
+        lagPerTopicPartition.put(e.getKey(), max(topicOffset - consumerOffset, 0));
       }
     }
 
-    return Optional.of(lagPerPartition);
+    return lagPerTopicPartition;
   }
 }

@@ -26,6 +26,7 @@ import com.google.cloud.run.kafkascaler.clients.KafkaAdminClientWrapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,11 +69,16 @@ public final class KafkaTest {
 
   private static ImmutableMap<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo>
       makeTopicOffsetsFromMap(Map<Integer, Long> partitionToOffset) {
+    return makeTopicOffsetsFromMap(TOPIC_NAME, partitionToOffset);
+  }
+
+  private static ImmutableMap<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo>
+      makeTopicOffsetsFromMap(String topicName, Map<Integer, Long> partitionToOffset) {
     ImmutableMap.Builder<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> topicOffsets =
         ImmutableMap.builder();
 
     for (Map.Entry<Integer, Long> e : partitionToOffset.entrySet()) {
-      TopicPartition topicPartition = new TopicPartition(TOPIC_NAME, e.getKey());
+      TopicPartition topicPartition = new TopicPartition(topicName, e.getKey());
       ListOffsetsResult.ListOffsetsResultInfo listOffsetsResultInfo =
           new ListOffsetsResult.ListOffsetsResultInfo(
               e.getValue(), /* timestamp= */ 0, Optional.empty());
@@ -83,11 +89,16 @@ public final class KafkaTest {
 
   private static ImmutableMap<TopicPartition, OffsetAndMetadata> makeConsumerGroupOffsetsFromMap(
       Map<Integer, Long> partitionToOffset) {
+    return makeConsumerGroupOffsetsFromMap(TOPIC_NAME, partitionToOffset);
+  }
+
+  private static ImmutableMap<TopicPartition, OffsetAndMetadata> makeConsumerGroupOffsetsFromMap(
+      String topicName, Map<Integer, Long> partitionToOffset) {
     ImmutableMap.Builder<TopicPartition, OffsetAndMetadata> consumerGroupOffsets =
         ImmutableMap.builder();
 
     for (Map.Entry<Integer, Long> e : partitionToOffset.entrySet()) {
-      TopicPartition topicPartition = new TopicPartition(TOPIC_NAME, e.getKey());
+      TopicPartition topicPartition = new TopicPartition(topicName, e.getKey());
       OffsetAndMetadata offsetAndMetadata = new OffsetAndMetadata(e.getValue(), "metadata");
       consumerGroupOffsets.put(topicPartition, offsetAndMetadata);
     }
@@ -169,8 +180,9 @@ public final class KafkaTest {
 
     String topic = "topic-not-in-describe-topics-response";
 
-    when(kafkaAdminClientWrapper.describeTopics(topic)).thenReturn(ImmutableMap.of());
-    assertThat(kafka.getLagPerPartition(topic, CONSUMER_GROUP_ID)).isEmpty();
+    when(kafkaAdminClientWrapper.describeTopics(ImmutableSet.of(topic)))
+        .thenReturn(ImmutableMap.of());
+    assertThat(kafka.getLagPerPartition(Optional.of(topic), CONSUMER_GROUP_ID)).isEmpty();
   }
 
   @Test
@@ -192,7 +204,7 @@ public final class KafkaTest {
     when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
         .thenReturn(consumerGroupOffsets);
 
-    assertThat(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID).get())
+    assertThat(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID).get())
         .containsExactly(
             new TopicPartition(TOPIC_NAME, 0), 33L, new TopicPartition(TOPIC_NAME, 1), 200L);
   }
@@ -217,7 +229,7 @@ public final class KafkaTest {
     when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
         .thenReturn(consumerGroupOffsets);
 
-    assertThat(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID).get())
+    assertThat(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID).get())
         .containsExactly(
             new TopicPartition(TOPIC_NAME, 0), 28L, new TopicPartition(TOPIC_NAME, 1), 200L);
   }
@@ -243,7 +255,7 @@ public final class KafkaTest {
     when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
         .thenReturn(consumerGroupOffsets);
 
-    assertThat(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID).get())
+    assertThat(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID).get())
         .containsExactly(
             new TopicPartition(TOPIC_NAME, 0), 28L, new TopicPartition(TOPIC_NAME, 1), 0L);
   }
@@ -269,7 +281,7 @@ public final class KafkaTest {
     when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
         .thenReturn(consumerGroupOffsets);
 
-    assertThat(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID).get())
+    assertThat(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID).get())
         .containsExactly(new TopicPartition(TOPIC_NAME, 0), 28L);
   }
 
@@ -293,10 +305,9 @@ public final class KafkaTest {
     when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
         .thenReturn(consumerGroupOffsets);
 
-    assertThat(kafka.getLagPerPartition(TOPIC_NAME, CONSUMER_GROUP_ID).get())
+    assertThat(kafka.getLagPerPartition(Optional.of(TOPIC_NAME), CONSUMER_GROUP_ID).get())
         .containsExactly(
             new TopicPartition(TOPIC_NAME, 0), 28L, new TopicPartition(TOPIC_NAME, 1), 100L);
-
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<Map<TopicPartition, OffsetSpec>> listOffsetsArgumentCaptor =
@@ -304,5 +315,42 @@ public final class KafkaTest {
     verify(kafkaAdminClientWrapper).listOffsets(listOffsetsArgumentCaptor.capture());
     assertThat(listOffsetsArgumentCaptor.getValue().keySet())
         .containsExactly(new TopicPartition(TOPIC_NAME, 0), new TopicPartition(TOPIC_NAME, 1));
+  }
+
+  @Test
+  public void getLagPerPartition_emptyTopicName_returnsLagForConsumerGroup()
+      throws InterruptedException, ExecutionException {
+    KafkaAdminClientWrapper kafkaAdminClientWrapper = mock(KafkaAdminClientWrapper.class);
+    Kafka kafka = new Kafka(kafkaAdminClientWrapper);
+
+    String topicName1 = "my-topic-1";
+    String topicName2 = "my-topic-2";
+    Map<TopicPartition, OffsetAndMetadata> consumerGroupOffsets = new HashMap<>();
+    consumerGroupOffsets.putAll(
+        makeConsumerGroupOffsetsFromMap(topicName1, ImmutableMap.of(0, 5L, 1, 100L)));
+    consumerGroupOffsets.putAll(
+        makeConsumerGroupOffsetsFromMap(topicName2, ImmutableMap.of(0, 20L, 1, 200L)));
+
+    ImmutableMap<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> topicOffsets =
+        makeTopicOffsetsFromMap(topicName1, ImmutableMap.of(0, 33L, 1, 200L));
+
+    when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
+        .thenReturn(ImmutableMap.copyOf(consumerGroupOffsets));
+    when(kafkaAdminClientWrapper.listOffsets(any())).thenReturn(topicOffsets);
+
+    assertThat(kafka.getLagPerPartition(Optional.empty(), CONSUMER_GROUP_ID).get())
+        .containsExactly(
+            new TopicPartition(topicName1, 0), 28L, new TopicPartition(topicName1, 1), 100L);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<TopicPartition, OffsetSpec>> listOffsetsArgumentCaptor =
+        ArgumentCaptor.forClass(Map.class);
+    verify(kafkaAdminClientWrapper).listOffsets(listOffsetsArgumentCaptor.capture());
+    assertThat(listOffsetsArgumentCaptor.getValue().keySet())
+        .containsExactly(
+            new TopicPartition(topicName1, 0),
+            new TopicPartition(topicName1, 1),
+            new TopicPartition(topicName2, 0),
+            new TopicPartition(topicName2, 1));
   }
 }

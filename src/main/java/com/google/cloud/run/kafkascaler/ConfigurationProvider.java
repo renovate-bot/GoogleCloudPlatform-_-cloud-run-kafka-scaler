@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -64,7 +65,7 @@ class ConfigurationProvider {
    * not be changed during the lifetime of the application.
    */
   public record StaticConfig(
-      String topicName,
+      Optional<String> topicName,
       String consumerGroupId,
       boolean useMinInstances,
       boolean outputScalerMetrics) {}
@@ -128,8 +129,7 @@ class ConfigurationProvider {
    * @throws IllegalArgumentException If required environment variables are missing.
    */
   StaticConfig staticConfig() throws IOException {
-    ImmutableSet<String> missingEnvVars =
-        getMissingEnvVars(ImmutableSet.of("KAFKA_TOPIC_ID", "CONSUMER_GROUP_ID"));
+    ImmutableSet<String> missingEnvVars = getMissingEnvVars(ImmutableSet.of("CONSUMER_GROUP_ID"));
 
     if (!missingEnvVars.isEmpty()) {
       throw new IllegalArgumentException(
@@ -137,7 +137,7 @@ class ConfigurationProvider {
               + String.join(",", missingEnvVars)
               + " are required but not set.");
     }
-    String topicName = envProvider.getEnv("KAFKA_TOPIC_ID");
+    Optional<String> topicName = Optional.ofNullable(envProvider.getEnv("KAFKA_TOPIC_ID"));
     String consumerGroupId = envProvider.getEnv("CONSUMER_GROUP_ID");
 
     boolean useMinInstances = USE_MIN_INSTANCES_DEFAULT;

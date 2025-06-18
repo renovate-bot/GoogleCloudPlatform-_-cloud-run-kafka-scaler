@@ -16,6 +16,7 @@
  */
 package com.google.cloud.run.kafkascaler.clients;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
@@ -51,9 +52,9 @@ public class KafkaAdminClientWrapper {
     return adminClient.listTopics().names().get();
   }
 
-  public Map<String, TopicDescription> describeTopics(String topicName)
+  public Map<String, TopicDescription> describeTopics(Collection<String> topicNames)
       throws InterruptedException, ExecutionException {
-    return adminClient.describeTopics(Collections.singleton(topicName)).allTopicNames().get();
+    return adminClient.describeTopics(topicNames).allTopicNames().get();
   }
 
   public Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> listOffsets(
