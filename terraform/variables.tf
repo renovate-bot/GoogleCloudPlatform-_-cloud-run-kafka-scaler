@@ -33,6 +33,7 @@ variable "consumer_sa_email" {
 variable "topic_id" {
   description = "The Kafka Topic ID the autoscaler will monitor."
   type        = string
+  default     = null
 }
 
 variable "consumer_group_id" {
@@ -74,7 +75,7 @@ variable "network" {
 variable "subnet" {
   description = "The self-link or ID of the VPC subnet for Cloud Run egress configuration. Example: projects/PROJECT_ID/regions/REGION/subnetworks/SUBNET_NAME."
   type        = string
-  default     = null 
+  default     = null
 }
 
 variable "scaler_cycle_seconds" {

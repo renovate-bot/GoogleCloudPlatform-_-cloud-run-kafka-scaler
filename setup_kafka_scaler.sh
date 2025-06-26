@@ -46,8 +46,6 @@ fi
 
 if [[ -n "${TOPIC_ID}" ]]; then
   echo "TOPIC_ID: $TOPIC_ID"
-else
-  missing_vars+=("TOPIC_ID")
 fi
 
 if [[ -n "${CONSUMER_GROUP_ID}" ]]; then
@@ -198,10 +196,13 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --condition=None --quiet
 
 # Setup Kafka scaler env vars file
-echo "KAFKA_TOPIC_ID: ${TOPIC_ID}
-CONSUMER_GROUP_ID: ${CONSUMER_GROUP_ID}
+echo "CONSUMER_GROUP_ID: ${CONSUMER_GROUP_ID}
 CYCLE_SECONDS: \"${CYCLE_SECONDS}\"
 OUTPUT_SCALER_METRICS: ${OUTPUT_SCALER_METRICS}" > scaler_env_vars.yaml
+
+if [[ -n "${TOPIC_ID}" ]]; then
+  echo "KAFKA_TOPIC_ID: ${TOPIC_ID}" >> scaler_env_vars.yaml
+fi
 
 # Only add Cloud Tasks related env vars if they are needed (cycle < 60s)
 if [[ "${CYCLE_SECONDS}" -lt 60 ]]; then

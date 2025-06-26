@@ -31,21 +31,21 @@ terraform {
 }
 
 locals {
-  tasks_sa_id   = coalesce(var.tasks_service_account_name, "${var.scaler_service_name}-tasks")
-  scaler_sa_id  = format("%s%s-sa", var.scaler_sa_name_prefix, var.scaler_service_name)
+  tasks_sa_id        = coalesce(var.tasks_service_account_name, "${var.scaler_service_name}-tasks")
+  scaler_sa_id       = format("%s%s-sa", var.scaler_sa_name_prefix, var.scaler_service_name)
   scheduler_job_name = "${var.scaler_service_name}-cron"
   scheduler_sa_id    = format("%s%s-sa", var.scheduler_sa_name_prefix, local.scheduler_job_name)
 
-  tasks_sa_email   = "${local.tasks_sa_id}@${var.project_id}.iam.gserviceaccount.com"
-  scaler_sa_email  = "${local.scaler_sa_id}@${var.project_id}.iam.gserviceaccount.com"
+  tasks_sa_email     = "${local.tasks_sa_id}@${var.project_id}.iam.gserviceaccount.com"
+  scaler_sa_email    = "${local.scaler_sa_id}@${var.project_id}.iam.gserviceaccount.com"
   scheduler_sa_email = "${local.scheduler_sa_id}@${var.project_id}.iam.gserviceaccount.com"
 
   # Environment variables for the scaler Cloud Run service
   scaler_env_vars = {
-    KAFKA_TOPIC_ID                     = var.topic_id
-    CONSUMER_GROUP_ID                  = var.consumer_group_id
-    CYCLE_SECONDS                      = tostring(var.scaler_cycle_seconds)
-    INVOKER_SERVICE_ACCOUNT_EMAIL      = local.tasks_sa_email
+    KAFKA_TOPIC_ID                = var.topic_id
+    CONSUMER_GROUP_ID             = var.consumer_group_id
+    CYCLE_SECONDS                 = tostring(var.scaler_cycle_seconds)
+    INVOKER_SERVICE_ACCOUNT_EMAIL = local.tasks_sa_email
   }
 }
 
@@ -62,19 +62,19 @@ resource "google_cloud_tasks_queue" "queue" {
 }
 
 resource "google_service_account" "tasks_sa" {
-  project      = var.project_id
-  account_id   = local.tasks_sa_id
+  project                      = var.project_id
+  account_id                   = local.tasks_sa_id
   create_ignore_already_exists = true
-  display_name = "Service Account for Cloud Tasks Invoker"
+  display_name                 = "Service Account for Cloud Tasks Invoker"
 }
 
 # --- Kafka Autoscaler Service Account and Permissions ---
 
 resource "google_service_account" "scaler_sa" {
-  project      = var.project_id
-  account_id   = local.scaler_sa_id
+  project                      = var.project_id
+  account_id                   = local.scaler_sa_id
   create_ignore_already_exists = true
-  display_name = "Service Account for Kafka Autoscaler"
+  display_name                 = "Service Account for Kafka Autoscaler"
 }
 
 # Grant Scaler SA permission to impersonate Consumer SA
@@ -139,10 +139,10 @@ resource "google_project_iam_member" "scaler_monitoring_viewer" {
 
 # Optional: Grant Scaler SA permission to use Managed Kafka
 resource "google_project_iam_member" "scaler_managed_kafka_client" {
-  count    = var.grant_managed_kafka_client_role ? 1 : 0
-  project  = var.project_id
-  role     = "roles/managedkafka.client"
-  member   = "serviceAccount:${local.scaler_sa_email}"
+  count   = var.grant_managed_kafka_client_role ? 1 : 0
+  project = var.project_id
+  role    = "roles/managedkafka.client"
+  member  = "serviceAccount:${local.scaler_sa_email}"
 }
 
 resource "time_sleep" "wait_for_scaler_sa_propagation" {
@@ -158,7 +158,7 @@ resource "time_sleep" "wait_for_scaler_sa_propagation" {
     # Map of triggers that are always present
     {
       scaler_impersonate_consumer = google_service_account_iam_member.scaler_impersonate_consumer.id
-      scaler_artifactregistry = google_project_iam_member.scaler_artifactregistry_reader.id
+      scaler_artifactregistry     = google_project_iam_member.scaler_artifactregistry_reader.id
       scaler_access_scaler_config = google_secret_manager_secret_iam_member.scaler_access_scaler_config.id
       scaler_access_admin_client  = google_secret_manager_secret_iam_member.scaler_access_admin_client.id
       scaler_run_admin            = google_project_iam_member.scaler_run_admin.id
@@ -169,7 +169,7 @@ resource "time_sleep" "wait_for_scaler_sa_propagation" {
     # Conditionally add the kafka client role trigger ONLY if the resource exists (count > 0)
     # Creates map { scaler_managed_kafka_client = "<resource_id>" } when true, or {} when false.
     var.grant_managed_kafka_client_role ?
-      { scaler_managed_kafka_client = google_project_iam_member.scaler_managed_kafka_client[0].id } 
+    { scaler_managed_kafka_client = google_project_iam_member.scaler_managed_kafka_client[0].id }
     : {}
   )
 }
@@ -180,7 +180,7 @@ resource "google_cloud_run_v2_service" "scaler_service" {
   project  = var.project_id
   location = var.region
   name     = var.scaler_service_name
-  labels   = merge(
+  labels = merge(
     {
       "created-by" = "scaler-kafka"
     },
@@ -223,8 +223,8 @@ resource "google_cloud_run_v2_service" "scaler_service" {
         for_each = (var.network != null && var.subnet != null) ? [1] : []
 
         content {
-          network = var.network
-          subnetwork  = var.subnet
+          network    = var.network
+          subnetwork = var.subnet
         }
       }
     }
@@ -246,18 +246,21 @@ resource "google_cloud_run_v2_service" "scaler_service" {
         secret = var.scaler_config_secret_name
         items {
           path    = "scaling"
-          version = var.scaler_config_secret_version 
+          version = var.scaler_config_secret_version
         }
       }
     }
 
     containers {
-      image = var.scaler_image_path
+      image          = var.scaler_image_path
       base_image_uri = "us-central1-docker.pkg.dev/serverless-runtimes/google-22/runtimes/java17"
 
-      env {
-        name  = "KAFKA_TOPIC_ID"
-        value = local.scaler_env_vars.KAFKA_TOPIC_ID
+      dynamic "env" {
+        for_each = local.scaler_env_vars.KAFKA_TOPIC_ID != null ? [1] : []
+        content {
+          name  = "KAFKA_TOPIC_ID"
+          value = local.scaler_env_vars.KAFKA_TOPIC_ID
+        }
       }
       env {
         name  = "CONSUMER_GROUP_ID"
@@ -282,7 +285,7 @@ resource "google_cloud_run_v2_service" "scaler_service" {
       }
       volume_mounts {
         name       = "scaler-config"
-        mount_path = "/scaler-config" 
+        mount_path = "/scaler-config"
       }
       # Define ports if needed, e.g.
       # ports {
@@ -298,7 +301,7 @@ resource "google_cloud_run_v2_service_iam_member" "tasks_invoke_scaler" {
   location = google_cloud_run_v2_service.scaler_service.location
   name     = google_cloud_run_v2_service.scaler_service.name
   role     = "roles/run.invoker"
-  member  = "serviceAccount:${local.tasks_sa_email}"
+  member   = "serviceAccount:${local.tasks_sa_email}"
   depends_on = [
     google_service_account.tasks_sa,
     google_cloud_run_v2_service.scaler_service,
@@ -310,10 +313,10 @@ resource "google_cloud_run_v2_service_iam_member" "tasks_invoke_scaler" {
 # --- Cloud Scheduler Resources ---
 
 resource "google_service_account" "scheduler_sa" {
-  project      = var.project_id
-  account_id   = local.scheduler_sa_id
+  project                      = var.project_id
+  account_id                   = local.scheduler_sa_id
   create_ignore_already_exists = true
-  display_name = "Service Account for Cloud Scheduler Job"
+  display_name                 = "Service Account for Cloud Scheduler Job"
 }
 
 # Grant Scheduler SA permission to invoke the Scaler Cloud Run service
@@ -341,7 +344,7 @@ resource "google_cloud_scheduler_job" "scaler_trigger" {
 
     oidc_token {
       service_account_email = local.scheduler_sa_email
-      audience              = google_cloud_run_v2_service.scaler_service.uri 
+      audience              = google_cloud_run_v2_service.scaler_service.uri
     }
   }
 
