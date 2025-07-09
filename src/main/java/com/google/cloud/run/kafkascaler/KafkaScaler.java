@@ -120,10 +120,10 @@ final class KafkaScaler {
         scaler.scale();
         RequestResponseHandler.sendSuccessResponse(exchange);
       } catch (IOException | ExecutionException | InterruptedException e) {
+        logger.atSevere().withCause(e).log("Exception while handling request: %s", e.getMessage());
         RequestResponseHandler.sendFailureResponse(exchange, e);
       } catch (RuntimeException e) {
-        logger.atSevere().log("Caught unchecked RuntimeException: %s", e.getMessage());
-        e.printStackTrace();
+        logger.atSevere().withCause(e).log("Unchecked RuntimeException: %s", e.getMessage());
         RequestResponseHandler.sendFailureResponse(exchange, e);
       }
     }
