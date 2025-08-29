@@ -126,7 +126,9 @@ administrator to grant you the following IAM roles:
 The autoscaler requires two secrets containing configuration:
 
 ##### a) Kafka Admin Client Secret (`ADMIN_CLIENT_SECRET`)
-The Kafka autoscaler connects to the Kafka cluster using the configuration provided in a secret that will be mounted as a volume on the Kafka autoscaler service.
+The Kafka autoscaler connects to the Kafka cluster using the configuration
+provided in a secret that will be mounted as a volume on the Kafka autoscaler
+service.
 
 At a minimum, the `bootstrap.servers` property must be configured with the
 bootstrap servers as a list of `HOST:PORT`.
@@ -136,8 +138,8 @@ bootstrap.servers=%BOOTSTRAP-SERVER-LIST%
 ```
 
 This secret can contain any of the [Kafka Admin
-client](https://kafka.apache.org/documentation/#adminclientconfigs) properties.
-For example, to connect to a Google [Managed Service for Apache
+client](https://kafka.apache.org/documentation/#adminclientconfigs)
+properties. For example, to connect to a Google [Managed Service for Apache
 Kafka](https://github.com/googleapis/managedkafka?tab=readme-ov-file#kafka-java-auth-client-handler)
  cluster using [application default
 credentials](https://cloud.google.com/authentication/provide-credentials-adc)
@@ -159,6 +161,9 @@ To create the secret volume, copy the configuration into a file named
 ```bash
 gcloud secrets create $ADMIN_CLIENT_SECRET --data-file=kafka_auth_config.txt
 ```
+
+Note: If you are using Google Managed Service for Apache Kafka, you will need to
+grant your scaler service account the role `roles/managedkafka.client`.
 
 ##### b) Scaler Configuration Secret (`SCALER_CONFIG_SECRET`)
 The Kafka autoscaler uses the configuration provided in this secret to
@@ -188,48 +193,6 @@ The following elements must be configured for the Kafka autoscaler to function:
 spec:
   scaleTargetRef:
     name: %FULLY_QUALIFIED_CONSUMER_NAME%
- metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: %TARGET_CPU_UTILIZATION%
-  - type: External
-    external:
-      metric:
-        name: consumer_lag
-      target:
-        type: AverageValue
-        averageValue: %LAG_THRESHOLD%
-```
-Note: While you may choose to configure `consumer_lag` only, we recommend
-starting with both `consumer_lag` and `cpu`, as just using `consumer_lag` can
-have unexpected results.
-
-###### Optional settings and defaults
-
-In addition to the metric targets, you can optionally configure additional
-elements to adjust scaling behavior. If not configured, the default values
-are used.
-
-*   `%CPU_ACTIVATION_THRESHOLD%` (default: 0) - Metric will be considered
-    "inactive" when below this threshold. When all metrics are "inactive",
-    target consumer will be scaled to zero.
-*   `%CPU_TOLERANCE%` (default: 0.1) - Prevent scaling changes if within
-    specified range (as a percent of the configured TARGET_CPU_UTILIZATION)
-*   `%CPU_METRIC_WINDOW%` (default: 120) - Period, in seconds, over which the
-    average CPU utilization is calculated
-*   `%LAG_ACTIVATION_THRESHOLD%` (default: 0) - Metric will be considered
-    "inactive" when below this threshold. When all metrics are "inactive",
-    target consumer will be scaled to zero.
-*   `%LAG_TOLERANCE%` (default: 0.1) - Prevent scaling changes if within
-    specified range (as a percent of the configured LAG_THRESHOLD)
-
-```yaml
-spec:
-  scaleTargetRef:
-    name: %FULLY_QUALIFIED_CONSUMER_NAME%
   metrics:
     - type: Resource
       resource:
@@ -237,9 +200,6 @@ spec:
         target:
           type: Utilization
           averageUtilization: %TARGET_CPU_UTILIZATION%
-          activationThreshold: `%CPU_ACTIVATION_THRESHOLD%`
-          tolerance: %CPU_TOLERANCE%`
-          windowSeconds: `%CPU_METRIC_WINDOW%`
     - type: External
       external:
         metric:
@@ -247,82 +207,13 @@ spec:
         target:
           type: AverageValue
           averageValue: %LAG_THRESHOLD%
-          activationThreshold: `%LAG_ACTIVATION_THRESHOLD%`
-          tolerance: `%LAG_TOLERANCE%`
 ```
+Note: While you may choose to configure `consumer_lag` only, we recommend
+starting with both `consumer_lag` and `cpu`, as just using `consumer_lag` can
+have unexpected results.
 
-###### Optional scaling policies
-
-If only the required elements are set, the default scaling policies, below,
-are used. Alternatively, you can configure either, or both, `scaleDown` and/or
-`scaleUp` policies. If only one of `scaleDown` or `scaleUp` is configured, the
-other will use the default configuration.
-
-```yaml
-behavior:
-  scaleDown:
-    stabilizationWindowSeconds: 300
-    policies:
-    - type: Percent
-      value: 50
-      periodSeconds: 30
-    selectPolicy: Min
-  scaleUp:
-    stabilizationWindowSeconds: 0
-    policies:
-    - type: Percent
-      value: 100
-      periodSeconds: 15
-    - type: Instances
-      value: 4
-      periodSeconds: 15
-    selectPolicy: Max
-```
-
-###### Full example config using default values
-
-```yaml
-spec:
-  scaleTargetRef:
-    name: projects/PROJECT-ID/locations/us-central1/workerpools/kafka-consumer-worker
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 60
-          activationThreshold: 0
-          tolerance: 0.1
-          windowSeconds: 120
-    - type: External
-      external:
-        metric:
-          name: consumer_lag
-        target:
-          type: AverageValue
-          averageValue: 1000
-          activationThreshold: 0
-          tolerance: 0.1
-  behavior:
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 50
-          periodSeconds: 30
-      selectPolicy: Min
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
-        - type: Instances
-          value: 4
-          periodSeconds: 15
-      selectPolicy: Max
-```
+See [Reference]((#optional-metric-configuration-options)) for additional
+configurable fields.
 
 ###### Create the secret
 
@@ -347,44 +238,65 @@ Choose the method that best suits your workflow.
 
 ### Option 1: Manual Deployment (`gcloud` / Shell Script)
 
-This approach uses the `setup_kafka_scaler.sh` script to create and configure the necessary resources.
+This approach uses the `setup_kafka_scaler.sh` script to create and
+configure the necessary resources.
 
 #### Set Environment Variables
 
-Before running the script, ensure that you have set **all** the environment variables mentioned below
+Set the following variables which are used by the setup script.
 
 ```bash
-# Details for already-deployed Kafka consumer
+# GCP Project ID
 export PROJECT_ID=<project-id>
+# GCP Region
 export REGION=<region>
+# Fully qualified name of the deployed Cloud Run service or worker pool to scale
+# Example: projects/my-project/locations/us-central1/workerpools/my-kafka-consumer
 export CONSUMER_SERVICE_NAME=<deployed-kafka-consumer>
-export CONSUMER_SA_EMAIL=<kafka-consumer-service-account-email i.e. NAME@PROJECT-ID.iam.gserviceaccount.com>
+# Email of the Service Account used by the consumer workload. The setup script
+# will grant the scaler service account permission to use consumer service
+# account.
+# Example: my-consumer-service-account@my-project.iam.gserviceaccount.com
+export CONSUMER_SA_EMAIL=<kafka-consumer-service-account-email>
+# Kafka consumer group ID to monitor
 export CONSUMER_GROUP_ID=<kafka-consumer-group-id>
-export NETWORK=<vpc-network>
-export SUBNET=<vpc-subnet>
 
-# Details for new items to be created during this setup
+# Name for the scaler Cloud Run service to be created
 export SCALER_SERVICE_NAME=<kafka-autoscaler-service-name>
+# Full Artifact Registry path to the scaler image built in the previous step
+# Example: us-central1-docker.pkg.dev/my-project/my-repo/my_kafka_autoscaler
 export SCALER_IMAGE_PATH=<kafka-autoscaler-image-URI>
+# Fully qualified name of the existing secret which contains scaling
+# configuration
+# Example: projects/my-project/secrets/scaler-config
 export SCALER_CONFIG_SECRET=<kafka-autoscaler-config-secret-name>
+# Fully qualified name of the existing secret which contains the Kafka Admin
+# Client properties for communicating with your Kafka broker
+# Example: projects/my-project/secrets/client-properties
+export ADMIN_CLIENT_SECRET=<kafka-admin-client-secret-name>
 
-export CYCLE_SECONDS=<scaler-check-frequency e.g. 15> # Note: this should be at
-least 5 seconds
+# Frequency in seconds for autoscaling checks. We recommend 5+ seconds.
+export CYCLE_SECONDS=<scaler-check-frequency e.g. 15>
+# Name for the Cloud Tasks queue (required if CYCLE_SECONDS < 60)
 export CLOUD_TASKS_QUEUE_NAME=<cloud-tasks-queue-for-scaling-checks>
+# Name for the Service Account to be created for Cloud Tasks to invoke the scaler (required if CYCLE_SECONDS < 60)
 export TASKS_SERVICE_ACCOUNT=<tasks-service-account-name>
 
-export OUTPUT_SCALER_METRICS=false # If you want scaling metrics to outputted
-to Cloud Monitoring set this to true and ensure your scaler service account has
-permission to write metrics (e.g. via roles/monitoring.metricWriter).
-```
-
-By default, this autoscaler will scale on the combined lag across all topics that
-the specified consumer group is subscribed to. You can optionally specify a
-single topic id which will cause your scaler to scale solely on the lag of
-specified topic.
-
-```bash
+# Optional: By default, this autoscaler will scale on the combined lag across
+# all topics that the specified consumer group is subscribed to. You can
+# optionally specify a single topic id which will cause your scaler to scale
+# solely on the lag of specified topic.
 export TOPIC_ID=<kafka-topic-id>
+
+# Optional: Set to true to output scaler metrics to Cloud Monitoring.
+# The scaler service account will need roles/monitoring.metricWriter.
+export OUTPUT_SCALER_METRICS=false
+
+# Optional: VPC Network name for the scaler service
+export NETWORK=<vpc-network>
+
+# Optional: VPC Subnet name for the scaler service
+export SUBNET=<vpc-subnet>
 ```
 
 #### Run the Setup Script
@@ -397,11 +309,12 @@ Execute the provided `setup_kafka_scaler.sh` script, as follows
 
 The script performs these actions:
 
-*   Creates the Cloud Tasks queue used to trigger autoscaling checks
+*   If `CYCLE_SECONDS` < 60, creates the Cloud Tasks queue used to trigger
+    autoscaling checks
 *   Creates the Kafka autoscaler service account, and grants necessary
     permissions
-*   Configures and deploys the Kafka autoscaler
-*   Create the Cloud Scheduler job that periodically triggers autoscaling checks
+*   Configures and deploys the Kafka autoscaler Cloud Run service
+*   Creates the Cloud Scheduler job that periodically triggers autoscaling checks
 
 When run, `setup_kafka_scaler.sh` will output the configured environment
 variables. Please verify they are correct before continuing.
@@ -473,7 +386,53 @@ script in the root of this repository can be used to delete the resources
 created by the setup script. If you used Terraform to deploy the resources,
 run `terraform destroy` to remove all associated infrastructure.
 
-## Reference: Scaling Configuration
+## Reference
+
+### Optional Metric Configuration Options
+
+In addition to the metric targets, you can optionally configure additional
+elements to adjust scaling behavior. If not configured, the default values
+are used.
+
+*   `%CPU_ACTIVATION_THRESHOLD%` (default: 0) - Metric will be considered
+    "inactive" when below this threshold. When all metrics are "inactive",
+    target consumer will be scaled to zero.
+*   `%CPU_TOLERANCE%` (default: 0.1) - Prevent scaling changes if within
+    specified range (as a percent of the configured TARGET_CPU_UTILIZATION)
+*   `%CPU_METRIC_WINDOW%` (default: 120) - Period, in seconds, over which the
+    average CPU utilization is calculated
+*   `%LAG_ACTIVATION_THRESHOLD%` (default: 0) - Metric will be considered
+    "inactive" when below this threshold. When all metrics are "inactive",
+    target consumer will be scaled to zero.
+*   `%LAG_TOLERANCE%` (default: 0.1) - Prevent scaling changes if within
+    specified range (as a percent of the configured LAG_THRESHOLD)
+
+```yaml
+spec:
+  scaleTargetRef:
+    name: %FULLY_QUALIFIED_CONSUMER_NAME%
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: %TARGET_CPU_UTILIZATION%
+          activationThreshold: `%CPU_ACTIVATION_THRESHOLD%`
+          tolerance: %CPU_TOLERANCE%`
+          windowSeconds: `%CPU_METRIC_WINDOW%`
+    - type: External
+      external:
+        metric:
+          name: consumer_lag
+        target:
+          type: AverageValue
+          averageValue: %LAG_THRESHOLD%
+          activationThreshold: `%LAG_ACTIVATION_THRESHOLD%`
+          tolerance: `%LAG_TOLERANCE%`
+```
+
+### Scaling Policy
 
 Note: See [Kubernetes Horizontal Pod
 Autoscaling](https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/horizontal-pod-autoscaler-v2/#HorizontalPodAutoscalerSpec)
@@ -509,6 +468,74 @@ behavior:
 *   `Instances`: Changes per-period are limited to the configured number of
     instances
 *   `periodSeconds`: Length of time over which the policy is enforced
+
+If either the `scaleUp` or `scaleDown` policy is unspecified, the following
+default default `scaleUp` and `scaleDown` policies will be used:
+
+```yaml
+behavior:
+  scaleDown:
+    stabilizationWindowSeconds: 300
+    policies:
+    - type: Percent
+      value: 50
+      periodSeconds: 30
+    selectPolicy: Min
+  scaleUp:
+    stabilizationWindowSeconds: 0
+    policies:
+    - type: Percent
+      value: 100
+      periodSeconds: 15
+    - type: Instances
+      value: 4
+      periodSeconds: 15
+    selectPolicy: Max
+```
+
+### Full example config
+```yaml
+spec:
+  scaleTargetRef:
+    name: projects/PROJECT-ID/locations/us-central1/workerpools/kafka-consumer-worker
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+          activationThreshold: 0
+          tolerance: 0.1
+          windowSeconds: 120
+    - type: External
+      external:
+        metric:
+          name: consumer_lag
+        target:
+          type: AverageValue
+          averageValue: 1000
+          activationThreshold: 0
+          tolerance: 0.1
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Instances
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+```
 
 ## Troubleshooting
 

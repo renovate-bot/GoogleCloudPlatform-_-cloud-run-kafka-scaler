@@ -131,19 +131,36 @@ read -p "Press any key to continue..."
 # Service Accounts setup
 ###
 
-# Create Kafka autoscaler service account
-gcloud iam service-accounts create $SCALER_SA_NAME
-
-#Create a service account for Cloud Scheduler:
-gcloud iam service-accounts create $CLOUD_SCHEDULER_SA \
-    --description="Service Acount for Cloud Scheduler to invoke Cloud Run" \
-    --project=$PROJECT_ID
-
-# Create Tasks service account
-if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
-  gcloud iam service-accounts create $TASKS_SERVICE_ACCOUNT
+# Create Kafka autoscaler service account if necessary
+SA_EMAIL="$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &> /dev/null; then
+  echo "Service account $SCALER_SA_NAME already exists."
+else
+  echo "Creating service account $SCALER_SA_NAME..."
+  gcloud iam service-accounts create "$SCALER_SA_NAME" --project="$PROJECT_ID"
 fi
 
+#Create a service account for Cloud Scheduler if necessary
+SA_EMAIL="$CLOUD_SCHEDULER_SA@$PROJECT_ID.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &> /dev/null; then
+  echo "Service account $CLOUD_SCHEDULER_SA already exists."
+else
+  echo "Creating service account $CLOUD_SCHEDULER_SA..."
+  gcloud iam service-accounts create "$CLOUD_SCHEDULER_SA" \
+      --description="Service Acount for Cloud Scheduler to invoke Cloud Run" \
+      --project="$PROJECT_ID"
+fi
+
+# Create Tasks service account if necessary
+if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
+  SA_EMAIL="$TASKS_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com"
+  if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &> /dev/null; then
+    echo "Service account $TASKS_SERVICE_ACCOUNT already exists."
+  else
+    echo "Creating service account $TASKS_SERVICE_ACCOUNT..."
+    gcloud iam service-accounts create "$TASKS_SERVICE_ACCOUNT" --project="$PROJECT_ID"
+  fi
+fi
 # Delay to allow time for propagation
 sleep 10
 
@@ -153,8 +170,8 @@ sleep 10
 
 if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
   # Create Cloud Tasks Queue
-  gcloud tasks queues create $CLOUD_TASKS_QUEUE_NAME --location=$REGION
-  FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME=projects/$PROJECT_ID/locations/$REGION/queues/$CLOUD_TASKS_QUEUE_NAME
+  gcloud tasks queues create "$CLOUD_TASKS_QUEUE_NAME" --location="$REGION"
+  FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME="projects/$PROJECT_ID/locations/$REGION/queues/$CLOUD_TASKS_QUEUE_NAME"
 fi
 
 ####
@@ -162,43 +179,50 @@ fi
 ####
 
 # Grant necessary permissions to Kafka autoscaler service account
-gcloud iam service-accounts add-iam-policy-binding $CONSUMER_SA_EMAIL \
+gcloud iam service-accounts add-iam-policy-binding "$CONSUMER_SA_EMAIL" \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/iam.serviceAccountUser" \
     --condition=None --quiet
 
-gcloud secrets add-iam-policy-binding $SCALER_CONFIG_SECRET \
+gcloud secrets add-iam-policy-binding "$SCALER_CONFIG_SECRET" \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/secretmanager.secretAccessor" \
     --condition=None --quiet
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
+gcloud secrets add-iam-policy-binding "$ADMIN_CLIENT_SECRET" \
+    --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" \
+    --condition=None --quiet
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/run.admin" \
     --condition=None --quiet
 
 if [[ "$CYCLE_SECONDS" -lt 60 ]]; then
-  gcloud tasks queues add-iam-policy-binding $CLOUD_TASKS_QUEUE_NAME \
+  gcloud tasks queues add-iam-policy-binding "$CLOUD_TASKS_QUEUE_NAME" \
       --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
       --role="roles/cloudtasks.enqueuer" \
-      --location=$REGION \
+      --location="$REGION" \
       --quiet
 fi
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/monitoring.metricWriter" \
     --condition=None --quiet
 
-gcloud projects add-iam-policy-binding $PROJECT_ID \
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/monitoring.viewer" \
     --condition=None --quiet
 
 # Setup Kafka scaler env vars file
-echo "CONSUMER_GROUP_ID: ${CONSUMER_GROUP_ID}
-CYCLE_SECONDS: \"${CYCLE_SECONDS}\"
-OUTPUT_SCALER_METRICS: ${OUTPUT_SCALER_METRICS}" > scaler_env_vars.yaml
+echo "CONSUMER_GROUP_ID: ${CONSUMER_GROUP_ID}" > scaler_env_vars.yaml
+
+if [[ -n "${OUTPUT_SCALER_METRICS}" ]]; then
+  echo "OUTPUT_SCALER_METRICS: \"${OUTPUT_SCALER_METRICS}\"" >> scaler_env_vars.yaml
+fi
 
 if [[ -n "${TOPIC_ID}" ]]; then
   echo "KAFKA_TOPIC_ID: ${TOPIC_ID}" >> scaler_env_vars.yaml
@@ -206,51 +230,58 @@ fi
 
 # Only add Cloud Tasks related env vars if they are needed (cycle < 60s)
 if [[ "${CYCLE_SECONDS}" -lt 60 ]]; then
-  echo "FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME: projects/${PROJECT_ID}/locations/${REGION}/queues/${CLOUD_TASKS_QUEUE_NAME}
+  echo "CYCLE_SECONDS: \"${CYCLE_SECONDS}\"
+FULLY_QUALIFIED_CLOUD_TASKS_QUEUE_NAME: projects/${PROJECT_ID}/locations/${REGION}/queues/${CLOUD_TASKS_QUEUE_NAME}
 INVOKER_SERVICE_ACCOUNT_EMAIL: ${TASKS_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" >> scaler_env_vars.yaml
 fi
 ####
 # Deploy the Kafka autoscaler
 ####
-gcloud run deploy $SCALER_SERVICE_NAME \
-    --region=$REGION \
-    --image=$SCALER_IMAGE_PATH \
+gcloud run deploy "$SCALER_SERVICE_NAME" \
+    --region="$REGION" \
+    --image="$SCALER_IMAGE_PATH" \
     --base-image=us-central1-docker.pkg.dev/serverless-runtimes/google-22/runtimes/java17 \
     --no-allow-unauthenticated \
     --vpc-egress=private-ranges-only \
-    --network=$NETWORK \
-    --subnet=$SUBNET \
+    --network="$NETWORK" \
+    --subnet="$SUBNET" \
     --service-account="$SCALER_SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
     --max-instances=1 \
-    --update-secrets=/kafka-config/kafka-client-properties=$ADMIN_CLIENT_SECRET:latest \
-    --update-secrets=/scaler-config/scaling=$SCALER_CONFIG_SECRET:latest \
+    --update-secrets=/kafka-config/kafka-client-properties="$ADMIN_CLIENT_SECRET":latest \
+    --update-secrets=/scaler-config/scaling="$SCALER_CONFIG_SECRET":latest \
     --labels=created-by=scaler-kafka \
-    --env-vars-file=scaler_env_vars.yaml
+    --env-vars-file=scaler_env_vars.yaml || exit 1
 
+if [[ "${CYCLE_SECONDS}" -lt 60 ]]; then
 # Grant Tasks service account Cloud Run Invoker on the Kafka autoscaler
-gcloud run services add-iam-policy-binding $SCALER_SERVICE_NAME \
+gcloud run services add-iam-policy-binding "$SCALER_SERVICE_NAME" \
     --member="serviceAccount:$TASKS_SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/run.invoker" \
+    --role="roles/run.invoker"
     --quiet
-
+fi
 ####
 # Create Cloud Scheduler Job to trigger Kafka autoscaler checks
 ####
 
 #Add necessary permissions
-gcloud run services add-iam-policy-binding $SCALER_SERVICE_NAME \
+gcloud run services add-iam-policy-binding "$SCALER_SERVICE_NAME" \
+    --region="$REGION" \
     --member="serviceAccount:$CLOUD_SCHEDULER_SA@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/run.invoker"
 
-#Create scheduler job:
-SCALER_URL=$(gcloud run services describe $SCALER_SERVICE_NAME --region us-central1 --format="value[](status.address.url)")
-
-gcloud scheduler jobs create http $CLOUD_SCHEDULER_JOB \
-   --location=$REGION \
-   --schedule="* * * * *" \
-   --uri=$SCALER_URL \
-   --oidc-service-account-email=$CLOUD_SCHEDULER_SA@$PROJECT_ID.iam.gserviceaccount.com \
-   --oidc-token-audience=$SCALER_URL
+# Create scheduler job if necessary:
+if gcloud scheduler jobs describe "$CLOUD_SCHEDULER_JOB" --location="$REGION" &> /dev/null; then
+  echo "Cloud Scheduler job $CLOUD_SCHEDULER_JOB already exists."
+else
+  echo "Creating Cloud Scheduler job $CLOUD_SCHEDULER_JOB..."
+  SCALER_URL=$(gcloud run services describe "$SCALER_SERVICE_NAME" --region $REGION --format="value[](status.address.url)")
+  gcloud scheduler jobs create http "$CLOUD_SCHEDULER_JOB" \
+    --location="$REGION" \
+    --schedule="* * * * *" \
+    --uri="$SCALER_URL" \
+    --oidc-service-account-email="$CLOUD_SCHEDULER_SA@$PROJECT_ID.iam.gserviceaccount.com" \
+    --oidc-token-audience="$SCALER_URL"
+fi
 
 # Cleanup
 rm -f scaler_env_vars.yaml
