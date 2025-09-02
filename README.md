@@ -7,8 +7,7 @@ your Kafka cluster, and uses [manual
 scaling](https://cloud.google.com/run/docs/configuring/services/manual-scaling)
 to scale a Kafka consumer workload based on the Kafka consumer lag metric.
 
-**Please send any questions or feedback related to this autoscaler to run-oss-
-autoscaler-feedback@google.com**.
+**Please send any questions or feedback related to this autoscaler to run-oss-autoscaler-feedback@google.com**.
 
 This autoscaler can be used with consumers running on Cloud Run services or the
 new worker pools resource (in Public Preview).
@@ -212,7 +211,7 @@ Note: While you may choose to configure `consumer_lag` only, we recommend
 starting with both `consumer_lag` and `cpu`, as just using `consumer_lag` can
 have unexpected results.
 
-See [Reference]((#optional-metric-configuration-options)) for additional
+See [Reference](#optional-metric-configuration-options) for additional
 configurable fields.
 
 ###### Create the secret
