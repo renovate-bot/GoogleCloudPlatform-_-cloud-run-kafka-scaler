@@ -1163,4 +1163,45 @@ public final class ScalerTest {
         .updateWorkerPoolManualInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
     verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
   }
+
+  @Test
+  public void scale_noTopicNameAndNoCommittedOffsets_scalesToZero()
+      throws IOException, InterruptedException, ExecutionException {
+    ConfigurationProvider.StaticConfig noTopicNameConfig =
+        new ConfigurationProvider.StaticConfig(
+            Optional.empty(),
+            CONSUMER_GROUP_ID,
+            /* useMinInstances= */ false,
+            /* outputScalerMetrics= */ false);
+
+    Scaler scaler =
+        new Scaler(
+            kafka,
+            scalingStabilizer,
+            cloudRunClientWrapper,
+            metricsService,
+            WORKERPOOL_WORKLOAD_INFO,
+            noTopicNameConfig,
+            configurationProvider);
+
+    int currentInstanceCount = 25;
+
+    Optional<Map<TopicPartition, Long>> lagPerPartition = Optional.of(ImmutableMap.of());
+
+    when(kafka.getCurrentConsumerCount(CONSUMER_GROUP_ID)).thenReturn(currentInstanceCount);
+    when(cloudRunClientWrapper.getWorkerPoolInstanceCount(WORKERPOOL_NAME))
+        .thenReturn(currentInstanceCount);
+    when(kafka.getLagPerPartition(Optional.empty(), CONSUMER_GROUP_ID)).thenReturn(lagPerPartition);
+
+    int newInstanceCount = 0;
+    when(scalingStabilizer.getBoundedRecommendation(
+            eq(BEHAVIOR), any(), eq(currentInstanceCount), eq(0)))
+        .thenReturn(newInstanceCount);
+
+    scaler.scale();
+
+    verify(cloudRunClientWrapper)
+        .updateWorkerPoolManualInstances(WORKERPOOL_WORKLOAD_INFO.name(), newInstanceCount);
+    verify(scalingStabilizer).markScaleEvent(eq(BEHAVIOR), any(), anyInt(), eq(newInstanceCount));
+  }
 }

@@ -353,4 +353,19 @@ public final class KafkaTest {
             new TopicPartition(topicName2, 0),
             new TopicPartition(topicName2, 1));
   }
+
+  @Test
+  public void getLagPerPartition_emptyTopicNameAndNoOffsets_returnsEmptyMap()
+      throws InterruptedException, ExecutionException {
+    KafkaAdminClientWrapper kafkaAdminClientWrapper = mock(KafkaAdminClientWrapper.class);
+    Kafka kafka = new Kafka(kafkaAdminClientWrapper);
+
+    when(kafkaAdminClientWrapper.listConsumerGroupOffsets(CONSUMER_GROUP_ID))
+        .thenReturn(ImmutableMap.of());
+
+    Optional<Map<TopicPartition, Long>> lag =
+        kafka.getLagPerPartition(Optional.empty(), CONSUMER_GROUP_ID);
+    assertThat(lag).isPresent();
+    assertThat(lag.get()).isEmpty();
+  }
 }

@@ -129,8 +129,8 @@ public class Kafka {
    * Gets the lag per TopicPartition for a given consumer group.
    *
    * @param consumerGroupId The ID of the consumer group.
-   * @return An Optional containing a map of TopicPartitions to lag, or an empty Optional if the
-   *     consumer group does not have any offsets.
+   * @return An Optional containing a map of TopicPartitions to lag, or an empty map if the consumer
+   *     group does not have any offsets.
    */
   private Optional<Map<TopicPartition, Long>> getLagPerPartitionForConsumerGroup(
       String consumerGroupId) throws InterruptedException, ExecutionException {
@@ -138,7 +138,7 @@ public class Kafka {
         adminClient.listConsumerGroupOffsets(consumerGroupId);
 
     if (consumerGroupOffsets.isEmpty()) {
-      return Optional.empty();
+      return Optional.of(Collections.emptyMap());
     }
 
     Map<TopicPartition, OffsetSpec> topicPartitionOffsets = new HashMap<>();
